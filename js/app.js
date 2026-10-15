@@ -80,7 +80,7 @@
     var cpuSlots = [0,1,2].map(function (i) { return songSlot(c.field[i], i, true); }).join('');
     var userSlots = [0,1,2].map(function (i) { return songSlot(u.field[i], i, false); }).join('');
     var hand = u.hand.map(function (card, i) { return '<button class="hand-card" data-action="play" data-index="' + i + '" ' + ((card.cost || 0) > u.cost ? 'disabled' : '') + '><b>' + esc(card.name) + '</b><br><small>' + card.type + ' / COST ' + card.cost + '</small></button>'; }).join('');
-    app.innerHTML = shell('<section class="battle"><div class="fighter"><div class="fighter-head"><b>CPU</b><span class="life">LIFE ' + c.life + '</span></div><div class="field">' + cpuSlots + '</div></div><div class="fighter"><div class="fighter-head"><b>YOU · TURN ' + b.turn + '</b><span>COST ' + u.cost + ' / ' + u.maxCost + ' · <span class="life">LIFE ' + u.life + '</span></span></div><div class="field">' + userSlots + '</div></div><div><small>HAND</small><div class="hand">' + hand + '</div></div><div class="log">' + b.log.slice(0,8).map(esc).join('<br>') + '</div></section><div class="battle-actions"><button class="secondary" data-action="phase">' + (b.phase === 'main' ? '攻撃フェーズ' : 'メインフェーズ') + '</button><button class="primary" data-action="end-turn">ターン終了</button></div>');
+    app.innerHTML = shell('<section class="battle"><div class="fighter"><div class="fighter-head"><b>CPU</b><span class="life">LIFE ' + c.life + '</span></div><div class="field">' + cpuSlots + '</div></div><div class="fighter"><div class="fighter-head"><b>YOU · TURN ' + b.turn + '</b><span>COST ' + u.cost + ' / ' + u.maxCost + ' · <span class="life">LIFE ' + u.life + '</span></span></div><div class="field">' + userSlots + '</div></div><div><small>HAND</small><div class="hand">' + hand + '</div></div><div class="log">' + b.log.slice(0,8).map(esc).join('<br>') + '</div>' + (testMode ? '<button class="secondary" data-action="test-finish">テスト: 勝利で終了</button>' : '') + '</section><div class="battle-actions"><button class="secondary" data-action="phase">' + (b.phase === 'main' ? '攻撃フェーズ' : 'メインフェーズ') + '</button><button class="primary" data-action="end-turn">ターン終了</button></div>');
   }
   function choose(title, buttons) {
     var modal = document.createElement('div'); modal.className = 'modal'; modal.innerHTML = '<div class="dialog"><h2>' + esc(title) + '</h2><div class="actions">' + buttons + '<button class="secondary" data-action="close-modal">キャンセル</button></div></div>'; document.body.appendChild(modal);
@@ -179,6 +179,7 @@
       else if (action === 'detail') cardDetail(button.dataset.card);
       else if (action === 'force-rare') { var card=VocaluCatalog.cards.find(function(c){return c.rarity===button.dataset.rare;});flash(button.dataset.rare);choose(button.dataset.rare+'演出確認',cardHtml(card,-1,false)); }
       else if (action === 'reset-save') { localStorage.removeItem(STORAGE);state.collection={};render(); }
+      else if (action === 'test-finish' && testMode) { state.battle.winner='user';finishBattle(); }
     } catch (err) { toast(err.message || '操作を続けられませんでした'); console.error(err); }
   });
 

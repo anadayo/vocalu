@@ -37,6 +37,10 @@ E.cpuTurn(combat,()=>0.1,null);
 assert.equal(combat.active,'user');
 E.attack(combat,'user',0,'life',null,null);
 assert.equal(combat.cpu.life,2,'direct attack removes one life');
+combat.cpu.life = 1;
+combat.user.field[0].attacked = false;
+E.attack(combat,'user',0,'life',null,null);
+assert.equal(combat.winner,'user','third life loss ends battle');
 
 const replacement = E.makeBattle(strongDeck, weakDeck, () => 0.1);
 replacement.user.cost = 10;
