@@ -1,0 +1,9 @@
+{
+  "name": "ボカる！ / VOCALU",
+  "short_name": "VOCALU",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#080a12",
+  "theme_color": "#0d1020",
+  "icons": []
+}
