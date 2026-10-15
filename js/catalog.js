@@ -17,6 +17,18 @@
   var producerNames = ['ryo','DECO*27','wowaka','ハチ','みきとP','ピノキオピー','40mP','kemu','Kanaria','バルーン','Orangestar','カンザキイオリ','Neru','ナユタン星人','じん','れるりり','黒うさP','kz','cosMo@暴走P','sasakure.UK','和田たけあき','日向電工','164','koyori','蝶々P','iroha(sasaki)','mothy','ゆうゆ','samfree','minato'];
   var singerNames = ['初音ミク','鏡音リン','鏡音レン','巡音ルカ','MEIKO','KAITO','GUMI','IA','flower','音街ウナ','可不','重音テト','歌愛ユキ','結月ゆかり','神威がくぽ','氷山キヨテル','猫村いろは','miki','VY1','VY2','Fukase','MAYU','蒼姫ラピス','kokone','東北ずん子','琴葉茜','琴葉葵','紲星あかり','星界','裏命','狐子','羽累','知声','ナクモ','めろう','ずんだもん','四国めたん','九州そら','双葉湊音','夏色花梨','小春六花','花隈千冬','ゲキヤク','カゼヒキ','足立レイ','波音リツ','桃音モモ','唄音ウタ','亞北ネル','弱音ハク'];
 
+  // YouTube上の公式投稿または公式アーティストチャンネルを確認した動画のみ登録する。
+  var verifiedVideos = {
+    '千本桜':'shs0rAiwsGQ','砂の惑星':'AS4q9yaWJkI','ゴーストルール':'KushW6zvazM','ヒバナ':'hW-Iy4CsCmQ','ヴァンパイア':'e1xCOsgWG0M',
+    'モザイクロール':'DnLFVUi3oOU','妄想感傷代償連盟':'8pGRdRhjX3o','乙女解剖':'7zwCIz-Ohn4','ローリンガール':'vnw8zURAxkU','アンノウン・マザーグース':'P_CSdxSGfaA',
+    'マトリョシカ':'HOz-9FzIDf0','ドーナツホール':'qnX2CdOBcDI','パンダヒーロー':'0RU_05zpETo','ロキ':'Xg-qfsKN2_E','少女レイ':'JW3N-HvU0MA',
+    'いーあるふぁんくらぶ':'oBgADhsOoog','サリシノハラ':'fAbO6CV7Qko','神っぽいな':'EHBFKhLUVig','すろぉもぉしょん':'ARt2fVT33Lw','魔法少女とチョコレゐト':'T2kS1gAbxhc',
+    'からくりピエロ':'xxFkW3PCT5M','恋愛裁判':'TXzfQ0cP1P0','六兆年と一夜物語':'Om3MTou2kPg','KING':'cm-l2h6GB8Q','酔いどれ知らず':'vB8sxY_PJ_w',
+    'QUEEN':'KFCaSz_yYCM','EYE':'sSHkXxADtaE','エンヴィーベイビー':'dgS6HvEohsw','シャルル':'TA5OFS_xX0c','アスノヨゾラ哨戒班':'XogSflwXgpw',
+    'DAYBREAK FRONTLINE':'emrt46SRyYs','命に嫌われている。':'0HYm60Mjm0k','ロストワンの号哭':'8oBV3jPTW4s','エイリアンエイリアン':'2t1NMRse6aI','太陽系デスコ':'Ja9qmYjXk6U',
+    'ダンスロボットダンス':'g7dvpD_zlIM','惑星ループ':'LNX0GsjBP2w','彗星ハネムーン':'wCj04kwAFX8','天ノ弱':'2-zPY0vrpjQ','カゲロウデイズ':'EMGyiiTC7sg'
+  };
+
   function rarityFor(index) {
     var roll = (index * 37 + 11) % 100;
     if (roll < 55) return 'N';
@@ -32,6 +44,7 @@
   rawSongs.forEach(function (line, index) {
     var parts = line.split('|');
     var basePower = powerFor(index);
+    var videoId = verifiedVideos[parts[0]] || null;
     [false, true].forEach(function (special, variant) {
       var id = 'song-' + String(index + 1).padStart(3, '0') + (special ? '-sp' : '');
       songs.push({
@@ -45,9 +58,11 @@
         cost: songCost(basePower),
         viewCount: null,
         viewCountVerifiedAt: null,
-        thumbnailUrl: null,
-        thumbnailVerified: false,
-        metricNote: '再生数・公式MV画像は確認待ち。対戦値はテスト用バランス値です。'
+        videoUrl: videoId ? 'https://www.youtube.com/watch?v=' + videoId : null,
+        thumbnailUrl: videoId ? 'https://i.ytimg.com/vi/' + videoId + '/hqdefault.jpg' : null,
+        thumbnailVerified: Boolean(videoId),
+        mediaVerifiedAt: videoId ? '2026-10-16' : null,
+        metricNote: videoId ? '公式動画を確認済み。再生数と対戦値の同期は準備中です。' : '公式MV画像は確認待ち。対戦値はテスト用バランス値です。'
       });
     });
   });

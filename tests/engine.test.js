@@ -9,6 +9,8 @@ assert.equal(global.VocaluCatalog.cards.length, 280, 'catalog total');
 assert.equal(global.VocaluCatalog.songs.length, 200, 'songs total');
 assert.equal(global.VocaluCatalog.producers.length, 30, 'producer total');
 assert.equal(global.VocaluCatalog.singers.length, 50, 'singer total');
+assert.equal(global.VocaluCatalog.songs.filter(c => c.thumbnailVerified).length, 80, '40 verified songs have two card variants');
+assert.ok(global.VocaluCatalog.songs.find(c => c.name === 'ローリンガール').videoUrl.includes('vnw8zURAxkU'));
 
 const opened = E.openFivePacks(global.VocaluCatalog.cards, rngSequence([0.1,0.2,0.5,0.8]));
 assert.equal(opened.length, 25, 'five packs contain 25 cards');

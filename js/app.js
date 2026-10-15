@@ -118,7 +118,8 @@
   function cardDetail(id) {
     var card = VocaluCatalog.cards.find(function (c) { return c.id === id; }); if (!card) return;
     var text = card.type === 'song' ? card.metricNote : (card.text || card.profile);
-    choose(card.name, '<p>' + esc(text) + '</p><p>所持 ' + (state.collection[id] || 0) + '枚</p>');
+    var officialLink = card.videoUrl ? '<a class="official-link" href="' + esc(card.videoUrl) + '" target="_blank" rel="noopener">YouTubeで公式MVを見る</a>' : '';
+    choose(card.name, '<p>' + esc(text) + '</p>' + officialLink + '<p>所持 ' + (state.collection[id] || 0) + '枚</p>');
   }
   function toast(message) { var old = document.querySelector('.error-toast'); if (old) old.remove(); var el = document.createElement('div'); el.className = 'error-toast'; el.textContent = message; document.body.appendChild(el); setTimeout(function () { el.remove(); }, 3500); }
 
@@ -186,6 +187,11 @@
   var startY=0;
   app.addEventListener('touchstart',function(e){var p=e.target.closest('[data-action="open-pack"]');if(p&&e.touches[0])startY=e.touches[0].clientY;},{passive:true});
   app.addEventListener('touchend',function(e){var p=e.target.closest('[data-action="open-pack"]');if(p&&e.changedTouches[0]&&startY-e.changedTouches[0].clientY>35)p.click();},{passive:true});
+  document.addEventListener('error',function(e){
+    if(e.target && e.target.matches && e.target.matches('.card-art img')){
+      var art=e.target.parentNode; art.textContent=e.target.alt.replace(' 公式MV',''); art.classList.add('image-fallback');
+    }
+  },true);
 
   function fatalError(message) { boot.hidden=true; app.hidden=true; fatal.hidden=false; document.getElementById('fatal-message').textContent=message; }
   window.addEventListener('error',function(e){ if(!app.hidden) toast('エラーから復旧しました: '+e.message); else fatalError('起動エラー: '+e.message); });
