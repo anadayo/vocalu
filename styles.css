@@ -4,3 +4,29 @@
 @keyframes sheen{to{transform:translateX(85%) rotate(25deg)}}@keyframes tear{55%{transform:scale(1.04) rotate(-2deg)}to{transform:scale(.85);opacity:0}}@keyframes flip{from{transform:rotateY(88deg);opacity:0}to{transform:none;opacity:1}}@keyframes flash{from{opacity:1}to{opacity:0}}
 @media(min-width:560px){.cards{grid-template-columns:repeat(3,minmax(0,1fr))}}@media(prefers-reduced-motion:reduce){*,*:before,*:after{animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important}}body.light-mode *{animation:none!important;transition:none!important}#yt-player{position:fixed;width:1px;height:1px;left:-10px;bottom:-10px;opacity:.01;pointer-events:none}
 .official-link{display:block;text-align:center;text-decoration:none;background:#ff2c85;color:#fff;font-weight:800;padding:13px;border-radius:7px}.image-fallback{color:var(--muted)}
+
+/* Vertical trading-card layout and complete artwork fallbacks. */
+.card{aspect-ratio:.71}
+.card>button{height:100%;display:flex;flex-direction:column}
+.card-top{height:31px;display:flex;align-items:center;justify-content:space-between;padding:4px 7px;background:#0a0e1c}
+.cost-badge{width:24px;height:24px;display:grid;place-items:center;border-radius:50%;background:var(--cyan);color:#061019;font-size:13px;font-weight:950}
+.card .card-art{flex:1;min-height:0;aspect-ratio:auto;padding:0;overflow:hidden}
+.card .card-body{width:100%;background:#121729}
+.card .rarity{position:static;background:#202944;padding:3px 6px;font-size:10px}
+.card-stats{display:grid;grid-template-columns:1fr 1.35fr;gap:4px;margin-top:6px}
+.card-stats span{padding:4px;background:#090d18;border:1px solid #303959;border-radius:4px;font-size:8px;color:var(--muted)}
+.card-stats b{display:block;font-size:12px;color:#fff;white-space:nowrap}
+.avatar-icon,.song-cover{width:100%;height:100%;min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;padding:8px;background:linear-gradient(145deg,hsl(var(--hue) 66% 34%),#11182c)}
+.avatar-icon:before{content:"";width:48%;aspect-ratio:1;border-radius:50%;background:radial-gradient(circle at 50% 35%,#fff 0 8%,hsl(var(--hue) 80% 65%) 9% 28%,#111a 29% 100%);border:2px solid #fff8;box-shadow:0 0 22px hsl(var(--hue) 90% 60%)}
+.avatar-icon b{font-size:18px}.avatar-icon span,.song-cover span{max-width:100%;font-size:11px;line-height:1.25;overflow-wrap:anywhere}
+.singer-icon{background:linear-gradient(145deg,hsl(var(--hue) 72% 42%),#2a1231)}
+.song-cover b{font-size:40px;text-shadow:0 0 20px #fff}.song-cover small{font-size:6px;letter-spacing:0;color:#d8e2ff}
+
+.fighter-head{align-items:center;gap:8px}.fighter-head>span:first-child{display:grid;gap:2px}.fighter-head small{color:var(--muted);font-size:10px}
+.life-area{display:flex;align-items:center;gap:7px;color:#ff6a8b;font-size:10px}
+.life-cards{display:flex;flex-direction:row-reverse}.life-card{width:22px;aspect-ratio:.71;display:grid;place-items:center;margin-left:-8px;border:1px solid #75ddff;border-radius:3px;background:linear-gradient(145deg,#222d58,#10162c);box-shadow:0 2px 5px #0008;color:#65e7ff;font-size:9px;font-weight:900;transform:rotate(3deg)}.life-card:nth-child(2){transform:rotate(-2deg)}
+.hand-card{position:relative;min-width:112px;width:112px;aspect-ratio:.71;display:flex;flex-direction:column;gap:5px;padding:6px;overflow:hidden}
+.hand-card .mini-art{height:88px;display:grid;place-items:center;overflow:hidden;background:#202a4d}.hand-card .mini-art img{width:100%;height:100%;object-fit:cover}
+.hand-card>b{font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.hand-card>small{font-size:9px;color:var(--muted)}
+.mini-cost{position:absolute;z-index:2;top:4px;left:4px;width:23px;height:23px;display:grid;place-items:center;border-radius:50%;background:var(--cyan);color:#061019;font-weight:900}
+.mini-art .avatar-icon:before{width:38%}.mini-art .avatar-icon,.mini-art .song-cover{gap:3px;padding:4px}.mini-art .avatar-icon span,.mini-art .song-cover span{font-size:8px}.mini-art .song-cover b{font-size:22px}.mini-art .song-cover small{display:none}

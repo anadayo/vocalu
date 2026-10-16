@@ -64,16 +64,18 @@
     rng = rng || Math.random;
     function player(cards) {
       var deck = clone(cards).sort(function () { return rng() - 0.5; });
-      return { life: 3, deck: deck, hand: deck.splice(0, 5), field: [], discard: [], maxCost: 0, cost: 0, producerUsed: false };
+      var hand = deck.splice(0, 3);
+      var lifeCards = deck.splice(0, 3);
+      return { life: 3, lifeCards: lifeCards, deck: deck, hand: hand, field: [], discard: [], maxCost: 0, cost: 0, producerUsed: false };
     }
     var state = { turn: 0, active: 'user', phase: 'main', winner: null, actionCount: 0, log: [] };
     state.user = player(deckCards);
     state.cpu = player(cpuCards);
-    startTurn(state, 'user');
+    startTurn(state, 'user', false);
     return state;
   }
 
-  function startTurn(state, side) {
+  function startTurn(state, side, drawCard) {
     var p = state[side];
     state.turn += side === 'user' ? 1 : 0;
     state.active = side;
@@ -82,7 +84,7 @@
     p.cost = p.maxCost;
     p.producerUsed = false;
     p.field.forEach(function (song) { song.attacked = false; });
-    if (p.deck.length) p.hand.push(p.deck.shift());
+    if (drawCard !== false && p.deck.length) p.hand.push(p.deck.shift());
     state.log.unshift((side === 'user' ? 'あなた' : 'CPU') + 'のターン');
     validate(state);
   }
@@ -150,6 +152,7 @@
         state.log.unshift(guard.name + ' でガード');
       } else {
         enemy.life -= 1;
+        if (enemy.lifeCards && enemy.lifeCards.length) enemy.lifeCards.pop();
         state.log.unshift(attacker.name + ' がライフへ攻撃');
         if (enemy.life <= 0) state.winner = side;
       }
@@ -161,12 +164,11 @@
   function endTurn(state, side) {
     ensureTurn(state, side);
     if (state.winner) return state;
-    startTurn(state, side === 'user' ? 'cpu' : 'user');
+    startTurn(state, side === 'user' ? 'cpu' : 'user', true);
     return state;
   }
 
-  function cpuTurn(state, rng, userGuardIndex) {
-    rng = rng || Math.random;
+  function cpuMainPhase(state) {
     if (state.active !== 'cpu' || state.winner) return state;
     var safety = 0;
     while (safety < 20) {
@@ -176,9 +178,15 @@
       });
       if (!playable.length) break;
       playable.sort(function (a, b) { return (b.card.power || b.card.boost || b.card.bonus || 0) - (a.card.power || a.card.boost || a.card.bonus || 0); });
-      var pick = playable[0];
-      try { playCard(state, 'cpu', pick.index, state.cpu.field.length >= 3 ? 0 : 0); } catch (ignore) { break; }
+      try { playCard(state, 'cpu', playable[0].index, state.cpu.field.length >= 3 ? 0 : 0); } catch (ignore) { break; }
     }
+    return state;
+  }
+
+  function cpuTurn(state, rng, userGuardIndex) {
+    rng = rng || Math.random;
+    if (state.active !== 'cpu' || state.winner) return state;
+    cpuMainPhase(state);
     var attackers = state.cpu.field.slice();
     var guardAvailable = userGuardIndex;
     attackers.forEach(function (song) {
@@ -208,5 +216,5 @@
     return true;
   }
 
-  return { RARITY_WEIGHTS: RARITY_WEIGHTS, openPack: openPack, openFivePacks: openFivePacks, autoBuild: autoBuild, makeBattle: makeBattle, playCard: playCard, attack: attack, endTurn: endTurn, cpuTurn: cpuTurn, validate: validate };
+  return { RARITY_WEIGHTS: RARITY_WEIGHTS, openPack: openPack, openFivePacks: openFivePacks, autoBuild: autoBuild, makeBattle: makeBattle, playCard: playCard, attack: attack, endTurn: endTurn, cpuMainPhase: cpuMainPhase, cpuTurn: cpuTurn, validate: validate };
 }));
