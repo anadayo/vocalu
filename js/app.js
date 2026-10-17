@@ -19,7 +19,10 @@
   function icon(type) { return type === 'song' ? '♪' : type === 'producer' ? 'P' : 'Vo'; }
   function hueFor(value) { var total=0; String(value).split('').forEach(function(c){total=(total+c.charCodeAt(0)*17)%360;}); return total; }
   function artHtml(card) {
-    if (card.thumbnailVerified && card.thumbnailUrl) return '<img src="' + esc(card.thumbnailUrl) + '" alt="' + esc(card.name) + ' 公式MV" loading="lazy">';
+    if (card.thumbnailVerified && card.thumbnailUrl) {
+      var imageKind = card.type === 'song' ? '公式MV' : 'プロフィール画像';
+      return '<img src="' + esc(card.thumbnailUrl) + '" alt="' + esc(card.name) + ' ' + imageKind + '" loading="lazy">';
+    }
     var hue = hueFor(card.id || card.name);
     if (card.type === 'producer') return '<div class="avatar-icon producer-icon" style="--hue:' + hue + '"><b>P</b><span>' + esc(card.name) + '</span></div>';
     if (card.type === 'singer') return '<div class="avatar-icon singer-icon" style="--hue:' + hue + '"><b>Vo</b><span>' + esc(card.name) + '</span></div>';
@@ -141,7 +144,8 @@
   function cardDetail(id) {
     var card = VocaluCatalog.cards.find(function (c) { return c.id === id; }); if (!card) return;
     var text = card.type === 'song' ? card.metricNote : (card.text || card.profile);
-    var officialLink = card.videoUrl ? '<a class="official-link" href="' + esc(card.videoUrl) + '" target="_blank" rel="noopener">公式掲載元を見る</a>' : '';
+    var sourceUrl = card.videoUrl || card.profileUrl;
+    var officialLink = sourceUrl ? '<a class="official-link" href="' + esc(sourceUrl) + '" target="_blank" rel="noopener">画像・掲載元を見る</a>' : '';
     choose(card.name, '<p>' + esc(text) + '</p>' + officialLink + '<p>所持 ' + (state.collection[id] || 0) + '枚</p>');
   }
   function toast(message) { var old = document.querySelector('.error-toast'); if (old) old.remove(); var el = document.createElement('div'); el.className = 'error-toast'; el.textContent = message; document.body.appendChild(el); setTimeout(function () { el.remove(); }, 3500); }

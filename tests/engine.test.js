@@ -10,7 +10,14 @@ assert.equal(global.VocaluCatalog.songs.length, 200, 'songs total');
 assert.equal(global.VocaluCatalog.producers.length, 30, 'producer total');
 assert.equal(global.VocaluCatalog.singers.length, 50, 'singer total');
 assert.equal(global.VocaluCatalog.songs.filter(c => c.thumbnailVerified).length, 200, 'all songs have verified artwork for both card variants');
+assert.equal(global.VocaluCatalog.producers.filter(c => c.thumbnailVerified && c.thumbnailUrl && c.profileUrl).length, 30, 'all producers have sourced profile artwork');
+assert.equal(global.VocaluCatalog.singers.filter(c => c.thumbnailVerified && c.thumbnailUrl && c.profileUrl).length, 50, 'all singers have sourced profile artwork');
 assert.ok(global.VocaluCatalog.songs.find(c => c.name === 'ローリンガール').videoUrl.includes('vnw8zURAxkU'));
+assert.ok(global.VocaluCatalog.producers.find(c => c.name === 'じん').thumbnailUrl.includes('/552.jpg'), 'Jin uses the verified producer profile');
+assert.ok(global.VocaluCatalog.producers.find(c => c.name === 'minato').thumbnailUrl.includes('/17.jpg'), 'minato uses the verified producer profile');
+assert.ok(global.VocaluCatalog.singers.find(c => c.name === '鏡音レン').thumbnailUrl.includes('/15.png'), 'Kagamine Len uses the character profile');
+assert.ok(global.VocaluCatalog.singers.find(c => c.name === 'flower').thumbnailUrl.includes('/21165.png'), 'flower uses the character profile');
+assert.ok(global.VocaluCatalog.singers.find(c => c.name === 'miki').thumbnailUrl.includes('/146.png'), 'miki uses the character profile');
 
 const opened = E.openFivePacks(global.VocaluCatalog.cards, rngSequence([0.1,0.2,0.5,0.8]));
 assert.equal(opened.length, 25, 'five packs contain 25 cards');

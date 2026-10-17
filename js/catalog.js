@@ -17,6 +17,35 @@
   var producerNames = ['ryo','DECO*27','wowaka','ハチ','みきとP','ピノキオピー','40mP','kemu','Kanaria','バルーン','Orangestar','カンザキイオリ','Neru','ナユタン星人','じん','れるりり','黒うさP','kz','cosMo@暴走P','sasakure.UK','和田たけあき','日向電工','164','koyori','蝶々P','iroha(sasaki)','mothy','ゆうゆ','samfree','minato'];
   var singerNames = ['初音ミク','鏡音リン','鏡音レン','巡音ルカ','MEIKO','KAITO','GUMI','IA','flower','音街ウナ','可不','重音テト','歌愛ユキ','結月ゆかり','神威がくぽ','氷山キヨテル','猫村いろは','miki','VY1','VY2','Fukase','MAYU','蒼姫ラピス','kokone','東北ずん子','琴葉茜','琴葉葵','紲星あかり','星界','裏命','狐子','羽累','知声','ナクモ','めろう','ずんだもん','四国めたん','九州そら','双葉湊音','夏色花梨','小春六花','花隈千冬','ゲキヤク','カゼヒキ','足立レイ','波音リツ','桃音モモ','唄音ウタ','亞北ネル','弱音ハク'];
 
+  function vocaDbProfile(id, extension) {
+    return { image: 'https://static.vocadb.net/img/Artist/mainOrig/' + id + '.' + (extension || 'png'), source: 'https://vocadb.net/Artist/Details/' + id, label: 'VocaDB掲載プロフィール画像' };
+  }
+
+  // 同名人物の取り違えを避けるため、確認済みのアーティストIDを明示する。
+  var producerProfiles = {
+    'ryo':vocaDbProfile(67,'jpg'),'DECO*27':vocaDbProfile(45,'jpg'),'wowaka':vocaDbProfile(53),'ハチ':vocaDbProfile(49,'jpg'),'みきとP':vocaDbProfile(876,'jpg'),
+    'ピノキオピー':vocaDbProfile(28,'jpg'),'40mP':vocaDbProfile(8,'jpg'),'kemu':vocaDbProfile(735,'jpg'),'Kanaria':vocaDbProfile(80976,'jpg'),'バルーン':vocaDbProfile(10259,'jpg'),
+    'Orangestar':vocaDbProfile(11630,'jpg'),'カンザキイオリ':vocaDbProfile(23721,'jpg'),'Neru':vocaDbProfile(137,'jpg'),'ナユタン星人':vocaDbProfile(36280,'jpg'),'じん':vocaDbProfile(552,'jpg'),
+    'れるりり':vocaDbProfile(712,'jpg'),'黒うさP':vocaDbProfile(310,'jpg'),'kz':vocaDbProfile(89,'jpg'),'cosMo@暴走P':vocaDbProfile(85,'jpg'),'sasakure.UK':vocaDbProfile(51,'jpg'),
+    '和田たけあき':vocaDbProfile(1226,'jpg'),'日向電工':vocaDbProfile(2435,'jpg'),'164':vocaDbProfile(41,'jpg'),'koyori':vocaDbProfile(308,'jpg'),'蝶々P':vocaDbProfile(96,'jpg'),
+    'iroha(sasaki)':vocaDbProfile(491,'jpg'),'mothy':vocaDbProfile(189),'ゆうゆ':vocaDbProfile(66,'jpg'),'samfree':vocaDbProfile(52,'jpg'),'minato':vocaDbProfile(17,'jpg')
+  };
+
+  var singerProfiles = {
+    '初音ミク':vocaDbProfile(1),'鏡音リン':vocaDbProfile(14),'鏡音レン':vocaDbProfile(15),'巡音ルカ':vocaDbProfile(2),'MEIKO':vocaDbProfile(176),
+    'KAITO':vocaDbProfile(71),'GUMI':vocaDbProfile(3),'IA':vocaDbProfile(504),'flower':vocaDbProfile(21165),'音街ウナ':vocaDbProfile(87780),
+    '可不':vocaDbProfile(83928),'重音テト':vocaDbProfile(116),'歌愛ユキ':vocaDbProfile(191),'結月ゆかり':vocaDbProfile(623),'神威がくぽ':vocaDbProfile(12),
+    '氷山キヨテル':vocaDbProfile(246),'猫村いろは':vocaDbProfile(77),'miki':vocaDbProfile(146),'VY1':vocaDbProfile(117),'VY2':vocaDbProfile(118),
+    'Fukase':vocaDbProfile(40866),'MAYU':vocaDbProfile(1766),'蒼姫ラピス':vocaDbProfile(156),'kokone':vocaDbProfile(16545),'東北ずん子':vocaDbProfile(16933),
+    '琴葉茜':vocaDbProfile(40988),'琴葉葵':vocaDbProfile(40989),'紲星あかり':vocaDbProfile(62968),'星界':vocaDbProfile(99953),'裏命':vocaDbProfile(105295),
+    '狐子':vocaDbProfile(110061),'羽累':vocaDbProfile(112287),'知声':vocaDbProfile(99757),'ナクモ':vocaDbProfile(89778),'めろう':vocaDbProfile(85854),
+    'ずんだもん':vocaDbProfile(58538),'四国めたん':vocaDbProfile(58539),'九州そら':vocaDbProfile(100778),'双葉湊音':vocaDbProfile(110840),'夏色花梨':vocaDbProfile(94959),
+    '小春六花':vocaDbProfile(85853),'花隈千冬':vocaDbProfile(103592),'ゲキヤク':vocaDbProfile(57096),'カゼヒキ':vocaDbProfile(43443),'足立レイ':vocaDbProfile(74389),
+    '波音リツ':vocaDbProfile(1746),'桃音モモ':vocaDbProfile(598),'唄音ウタ':vocaDbProfile(803),
+    '亞北ネル':{image:'https://miku.sega.jp/mega39s/img/module/module_10.png',source:'https://miku.sega.jp/mega39s/module/etc/',label:'SEGA公式掲載画像'},
+    '弱音ハク':{image:'https://miku.sega.jp/mega39s/img/module/module_9.png',source:'https://miku.sega.jp/mega39s/module/etc/',label:'SEGA公式掲載画像'}
+  };
+
   // YouTube上の公式投稿または公式アーティストチャンネルを確認した動画のみ登録する。
   var verifiedVideos = {
     '千本桜':'shs0rAiwsGQ','砂の惑星':'AS4q9yaWJkI','ゴーストルール':'KushW6zvazM','ヒバナ':'hxSg2Ioz3LM','ヴァンパイア':'e1xCOsgWG0M',
@@ -92,10 +121,12 @@
   });
 
   var producers = producerNames.map(function (name, index) {
-    return { id: 'producer-' + String(index + 1).padStart(2, '0'), type: 'producer', name: name, rarity: rarityFor(index + 40), cost: 1 + index % 3, bonus: 500 + index % 4 * 500, text: '自分の楽曲を強化。制作楽曲が場にあると効果が2倍。' };
+    var profile = producerProfiles[name];
+    return { id: 'producer-' + String(index + 1).padStart(2, '0'), type: 'producer', name: name, rarity: rarityFor(index + 40), cost: 1 + index % 3, bonus: 500 + index % 4 * 500, text: '自分の楽曲を強化。制作楽曲が場にあると効果が2倍。', thumbnailUrl: profile.image, thumbnailVerified: true, profileUrl: profile.source, mediaSource: profile.label, mediaVerifiedAt: '2026-10-17' };
   });
   var singers = singerNames.map(function (name, index) {
-    return { id: 'singer-' + String(index + 1).padStart(2, '0'), type: 'singer', name: name, rarity: rarityFor(index + 70), cost: 1 + index % 3, boost: 500 + index % 5 * 500, profile: '楽曲に装備し、歌声の個性でパワーを加えるサポートカード。' };
+    var profile = singerProfiles[name];
+    return { id: 'singer-' + String(index + 1).padStart(2, '0'), type: 'singer', name: name, rarity: rarityFor(index + 70), cost: 1 + index % 3, boost: 500 + index % 5 * 500, profile: '楽曲に装備し、歌声の個性でパワーを加えるサポートカード。', thumbnailUrl: profile.image, thumbnailVerified: true, profileUrl: profile.source, mediaSource: profile.label, mediaVerifiedAt: '2026-10-17' };
   });
 
   var catalog = songs.concat(producers, singers);
