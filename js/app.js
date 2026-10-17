@@ -141,7 +141,7 @@
   function cardDetail(id) {
     var card = VocaluCatalog.cards.find(function (c) { return c.id === id; }); if (!card) return;
     var text = card.type === 'song' ? card.metricNote : (card.text || card.profile);
-    var officialLink = card.videoUrl ? '<a class="official-link" href="' + esc(card.videoUrl) + '" target="_blank" rel="noopener">YouTubeで公式MVを見る</a>' : '';
+    var officialLink = card.videoUrl ? '<a class="official-link" href="' + esc(card.videoUrl) + '" target="_blank" rel="noopener">公式掲載元を見る</a>' : '';
     choose(card.name, '<p>' + esc(text) + '</p>' + officialLink + '<p>所持 ' + (state.collection[id] || 0) + '枚</p>');
   }
   function toast(message) { var old = document.querySelector('.error-toast'); if (old) old.remove(); var el = document.createElement('div'); el.className = 'error-toast'; el.textContent = message; document.body.appendChild(el); setTimeout(function () { el.remove(); }, 3500); }

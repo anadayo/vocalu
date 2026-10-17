@@ -19,14 +19,36 @@
 
   // YouTube上の公式投稿または公式アーティストチャンネルを確認した動画のみ登録する。
   var verifiedVideos = {
-    '千本桜':'shs0rAiwsGQ','砂の惑星':'AS4q9yaWJkI','ゴーストルール':'KushW6zvazM','ヒバナ':'hW-Iy4CsCmQ','ヴァンパイア':'e1xCOsgWG0M',
+    '千本桜':'shs0rAiwsGQ','砂の惑星':'AS4q9yaWJkI','ゴーストルール':'KushW6zvazM','ヒバナ':'hxSg2Ioz3LM','ヴァンパイア':'e1xCOsgWG0M',
     'モザイクロール':'DnLFVUi3oOU','妄想感傷代償連盟':'8pGRdRhjX3o','乙女解剖':'7zwCIz-Ohn4','ローリンガール':'vnw8zURAxkU','アンノウン・マザーグース':'P_CSdxSGfaA',
     'マトリョシカ':'HOz-9FzIDf0','ドーナツホール':'qnX2CdOBcDI','パンダヒーロー':'0RU_05zpETo','ロキ':'Xg-qfsKN2_E','少女レイ':'JW3N-HvU0MA',
     'いーあるふぁんくらぶ':'oBgADhsOoog','サリシノハラ':'fAbO6CV7Qko','神っぽいな':'EHBFKhLUVig','すろぉもぉしょん':'ARt2fVT33Lw','魔法少女とチョコレゐト':'T2kS1gAbxhc',
     'からくりピエロ':'xxFkW3PCT5M','恋愛裁判':'TXzfQ0cP1P0','六兆年と一夜物語':'Om3MTou2kPg','KING':'cm-l2h6GB8Q','酔いどれ知らず':'vB8sxY_PJ_w',
     'QUEEN':'KFCaSz_yYCM','EYE':'sSHkXxADtaE','エンヴィーベイビー':'dgS6HvEohsw','シャルル':'TA5OFS_xX0c','アスノヨゾラ哨戒班':'XogSflwXgpw',
     'DAYBREAK FRONTLINE':'emrt46SRyYs','命に嫌われている。':'0HYm60Mjm0k','ロストワンの号哭':'8oBV3jPTW4s','エイリアンエイリアン':'2t1NMRse6aI','太陽系デスコ':'Ja9qmYjXk6U',
-    'ダンスロボットダンス':'g7dvpD_zlIM','惑星ループ':'LNX0GsjBP2w','彗星ハネムーン':'wCj04kwAFX8','天ノ弱':'2-zPY0vrpjQ','カゲロウデイズ':'EMGyiiTC7sg'
+    'ダンスロボットダンス':'g7dvpD_zlIM','惑星ループ':'LNX0GsjBP2w','彗星ハネムーン':'wCj04kwAFX8','天ノ弱':'2-zPY0vrpjQ','カゲロウデイズ':'EMGyiiTC7sg',
+    'Tell Your World':'PqJNc9KVIZE','Hand in Hand':'RKtoreimcQ8','39':'ecU_uJRzhfk','愛言葉':'I0eeS5wYGzI','二息歩行':'O4ygRYdrwWk',
+    '弱虫モンブラン':'B-A2eYlbrwQ','アンデッドアリス':'3CsQyaZOHhI','裏表ラバーズ':'b_cuMcDWwsI','ワールズエンド・ダンスホール':'ZB75e7vzX0I','積み木の人形':'6nrK6iTVkz4',
+    '結ンデ開イテ羅刹ト骸':'AKffZySqQts','リンネ':'EahYs-8tTjQ','バレリーコ':'4Ohpj2GDbRQ','ありふれたせかいせいふく':'8Z3TbMBfDM0','腐れ外道とチョコレゐト':'sHnvEsNU1X0',
+    'トリノコシティ':'yIQDGwyJpSo','キリトリセン':'EjYwEoZHKvQ','ドレミファロンド':'bphS6_wayug','人生リセットボタン':'IN3kbST908c','敗北の少年':'w2ySuxC2SNI',
+    'インビジブル':'vXSpdipuiFs','地球最後の告白を':'s8KBk8ZRH54','雨とペトラ':'PdfdOhYVU40','レディーレ':'cweRY2J9EZI','花瓶に触れた':'1U7KFKO5GPo',
+    'メーベル':'PfCcIsDmlfA','快晴':'BwGpXK3W6tE','イヤホンと蝉時雨':'UBqPPkB_Ybc','回る空うさぎ':'CLywtSOj4NA','あの夏が飽和する。':'mKaRxty1j7g',
+    '君の神様になりたい。':'X5kQR92kYn0','ハウトゥー世界征服':'HdC2cB_DZok','脱法ロック':'u5mHVUwDf_0','東京テディベア':'eSI7RsjZy1E','再教育':'xauTD6nRMio',
+    'チュルリラ・チュルリラ・ダッダッダ！':'_j0kfGNwIlw','ブリキノダンス':'6EuR6FuOXXw','脳漿炸裂ガール':'Ey_NHZNYTeE','聖槍爆裂ボーイ':'MqNmKnCNLyM','夜咄ディセイブ':'aPDaFGqMX4I',
+    'チルドレンレコード':'8xR6zghZM1c','アウターサイエンス':'HswIHVN5D4o','如月アテンション':'-y3BSoHOT9A','独りんぼエンヴィー':'PXZmn1nf-7Q','心做し':'3SkNrZnoK5w',
+    '炉心融解':'dSw8CucthGc','右肩の蝶':'HhOK1-whpsc','悪ノ娘':'sV7ODBvxw38','悪ノ召使':'GC6YNb6ZLKg','深海少女':'2CwBFr-Eoxg',
+    '1925':'QvGLt5CUBVo','ダブルラリアット':'hC8KrIY8qT4','Just Be Friends':'li1WjKl2boY'
+  };
+
+  // YouTubeに制作者本人の原曲投稿がない作品は、本人投稿または公式配信の画像を使う。
+  var verifiedArtwork = {
+    'メルト': { url: 'https://www.nicovideo.jp/watch/sm1715919', thumb: 'https://nicovideo.cdn.nimg.jp/thumbnails/1715919/1715919', source: 'ニコニコ動画・制作者本人投稿' },
+    'ワールドイズマイン': { url: 'https://www.nicovideo.jp/watch/sm3504435', thumb: 'https://nicovideo.cdn.nimg.jp/thumbnails/3504435/3504435', source: 'ニコニコ動画・制作者本人投稿' },
+    '初音ミクの消失': { url: 'https://www.nicovideo.jp/watch/sm1476648', thumb: 'https://nicovideo.cdn.nimg.jp/thumbnails/1476648/1476648', source: 'ニコニコ動画・制作者本人投稿' },
+    'みくみくにしてあげる♪': { url: 'https://www.nicovideo.jp/watch/sm1097445', thumb: 'https://nicovideo.cdn.nimg.jp/thumbnails/1097445/1097445', source: 'ニコニコ動画・制作者本人投稿' },
+    'ODDS&ENDS': { url: 'https://music.apple.com/jp/album/odds-ends-%E5%88%9D%E9%9F%B3%E3%83%9F%E3%82%AF-%E3%83%9E%E3%82%B8%E3%82%AB%E3%83%AB%E3%83%9F%E3%83%A9%E3%82%A4-2014-live-feat-%E5%88%9D%E9%9F%B3%E3%83%9F%E3%82%AF/969914420?i=969914590', thumb: 'https://is1-ssl.mzstatic.com/image/thumb/Music115/v4/2f/89/69/2f8969f3-defc-aca7-debf-63b7f9d2a946/4511820-93366.jpg/600x600bb.jpg', source: 'Apple Music公式配信' },
+    'ルカルカ★ナイトフィーバー': { url: 'https://www.nicovideo.jp/watch/sm6119955', thumb: 'https://nicovideo.cdn.nimg.jp/thumbnails/6119955/6119955', source: 'ニコニコ動画・制作者本人投稿' },
+    'magnet': { url: 'https://www.nicovideo.jp/watch/sm6909505', thumb: 'https://nicovideo.cdn.nimg.jp/thumbnails/6909505/6909505', source: 'ニコニコ動画・制作者本人投稿' }
   };
 
   function rarityFor(index) {
@@ -45,6 +67,7 @@
     var parts = line.split('|');
     var basePower = powerFor(index);
     var videoId = verifiedVideos[parts[0]] || null;
+    var artwork = verifiedArtwork[parts[0]] || null;
     [false, true].forEach(function (special, variant) {
       var id = 'song-' + String(index + 1).padStart(3, '0') + (special ? '-sp' : '');
       songs.push({
@@ -58,11 +81,12 @@
         cost: songCost(basePower),
         viewCount: null,
         viewCountVerifiedAt: null,
-        videoUrl: videoId ? 'https://www.youtube.com/watch?v=' + videoId : null,
-        thumbnailUrl: videoId ? 'https://i.ytimg.com/vi/' + videoId + '/hqdefault.jpg' : null,
-        thumbnailVerified: Boolean(videoId),
-        mediaVerifiedAt: videoId ? '2026-10-16' : null,
-        metricNote: videoId ? '公式動画を確認済み。再生数と対戦値の同期は準備中です。' : '公式MV画像は確認待ち。対戦値はテスト用バランス値です。'
+        videoUrl: videoId ? 'https://www.youtube.com/watch?v=' + videoId : artwork ? artwork.url : null,
+        thumbnailUrl: videoId ? 'https://i.ytimg.com/vi/' + videoId + '/hqdefault.jpg' : artwork ? artwork.thumb : null,
+        thumbnailVerified: Boolean(videoId || artwork),
+        mediaVerifiedAt: videoId || artwork ? '2026-10-17' : null,
+        mediaSource: videoId ? 'YouTube公式投稿' : artwork ? artwork.source : null,
+        metricNote: videoId || artwork ? '作品と投稿元を確認済み。再生数と対戦値の同期は準備中です。' : '公式画像は確認待ち。対戦値はテスト用バランス値です。'
       });
     });
   });
