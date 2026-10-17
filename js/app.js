@@ -78,9 +78,10 @@
     state.battle = VocaluEngine.makeBattle(deck, makeCpuDeck());
     state.screen = 'battle'; render();
   }
-  function songSlot(song, index, enemy) {
+  function songSlot(song, index, enemy, canAct) {
     if (!song) return '<div class="slot">EMPTY</div>';
-    return '<button class="slot ready ' + (song.attacked ? 'used' : '') + '" type="button" data-action="' + (enemy ? 'attack-song' : 'attack-life') + '" data-index="' + index + '"><b>' + esc(song.name) + '</b><br>POW ' + song.currentPower + '<br>' + (song.attacked ? '行動済み' : '攻撃可能') + '</button>';
+    var disabled = !enemy && (!canAct || song.attacked);
+    return '<button class="slot ready ' + (song.attacked ? 'used' : '') + '" type="button" data-action="' + (enemy ? 'attack-song' : 'choose-attack') + '" data-index="' + index + '" ' + (disabled ? 'disabled' : '') + '><span class="slot-art">' + artHtml(song) + '</span><span class="slot-copy"><b>' + esc(song.name) + '</b><span>POW <strong>' + song.currentPower + '</strong></span><small>' + (enemy ? '攻撃対象' : song.attacked ? '行動済み' : 'タップして攻撃') + '</small></span></button>';
   }
   function lifeCards(count) {
     var cards='';
@@ -89,10 +90,12 @@
   }
   function renderBattle() {
     var b = state.battle, u = b.user, c = b.cpu;
-    var cpuSlots = [0,1,2].map(function (i) { return songSlot(c.field[i], i, true); }).join('');
-    var userSlots = [0,1,2].map(function (i) { return songSlot(u.field[i], i, false); }).join('');
-    var hand = u.hand.map(function (card, i) { var value=card.type==='song'?card.power:(card.boost||card.bonus); return '<button class="hand-card" data-action="play" data-index="' + i + '" ' + ((card.cost || 0) > u.cost ? 'disabled' : '') + '><span class="mini-cost">' + card.cost + '</span><span class="mini-art">' + artHtml(card) + '</span><b>' + esc(card.name) + '</b><small>' + (card.type==='song'?'POW ':'BOOST +') + value + '</small></button>'; }).join('');
-    app.innerHTML = shell('<section class="battle"><div class="fighter"><div class="fighter-head"><b>CPU</b>' + lifeCards(c.life) + '</div><div class="field">' + cpuSlots + '</div></div><div class="fighter"><div class="fighter-head"><span><b>YOU</b><small>TURN ' + b.turn + ' · COST ' + u.cost + '/' + u.maxCost + '</small></span>' + lifeCards(u.life) + '</div><div class="field">' + userSlots + '</div></div><div><small>HAND</small><div class="hand">' + hand + '</div></div><div class="log">' + b.log.slice(0,8).map(esc).join('<br>') + '</div>' + (testMode ? '<button class="secondary" data-action="test-finish">テスト: 勝利で終了</button>' : '') + '</section><div class="battle-actions"><button class="secondary" data-action="phase">' + (b.phase === 'main' ? '攻撃フェーズ' : 'メインフェーズ') + '</button><button class="primary" data-action="end-turn">ターン終了</button></div>');
+    var userActive = b.active === 'user';
+    var cpuSlots = [0,1,2].map(function (i) { return songSlot(c.field[i], i, true, false); }).join('');
+    var userSlots = [0,1,2].map(function (i) { return songSlot(u.field[i], i, false, userActive); }).join('');
+    var hand = u.hand.map(function (card, i) { var value=card.type==='song'?card.power:(card.boost||card.bonus); return '<button class="hand-card" data-action="play" data-index="' + i + '" ' + (!userActive || (card.cost || 0) > u.cost ? 'disabled' : '') + '><span class="mini-cost">' + card.cost + '</span><span class="mini-art">' + artHtml(card) + '</span><b>' + esc(card.name) + '</b><small>' + (card.type==='song'?'POW ':'BOOST +') + value + '</small></button>'; }).join('');
+    var turnStatus = userActive ? '<span class="turn-status user-turn">YOUR TURN</span>' : '<span class="turn-status cpu-turn">CPU THINKING</span>';
+    app.innerHTML = shell('<section class="battle">' + turnStatus + '<div class="fighter"><div class="fighter-head"><span><b>CPU</b><small>HAND ' + c.hand.length + ' · DECK ' + c.deck.length + '</small></span>' + lifeCards(c.life) + '</div><div class="field">' + cpuSlots + '</div></div><div class="fighter"><div class="fighter-head"><span><b>YOU</b><small>TURN ' + b.turn + ' · COST ' + u.cost + '/' + u.maxCost + ' · DECK ' + u.deck.length + '</small></span>' + lifeCards(u.life) + '</div><div class="field">' + userSlots + '</div></div><div><small>HAND</small><div class="hand">' + hand + '</div></div><div class="log">' + b.log.slice(0,8).map(esc).join('<br>') + '</div>' + (testMode ? '<button class="secondary" data-action="test-finish">テスト: 勝利で終了</button>' : '') + '</section><div class="battle-actions"><button class="secondary" data-action="phase" ' + (!userActive ? 'disabled' : '') + '>' + (b.phase === 'main' ? '攻撃フェーズ' : 'メインフェーズ') + '</button><button class="primary" data-action="end-turn" ' + (!userActive ? 'disabled' : '') + '>ターン終了</button></div>');
   }
   function choose(title, buttons, canCancel) {
     var cancel = canCancel === false ? '' : '<button class="secondary" data-action="close-modal">キャンセル</button>';
@@ -112,6 +115,13 @@
     var guard = cpu.field.findIndex(function (song) { return song.currentPower <= state.battle.user.field[attackerIndex].currentPower; });
     VocaluEngine.attack(state.battle, 'user', attackerIndex, 'life', null, guard >= 0 && cpu.life === 1 ? guard : null);
     afterAction();
+  }
+  function chooseAttack(attackerIndex) {
+    var attacker = state.battle.user.field[attackerIndex];
+    if (!attacker || attacker.attacked) return toast('この楽曲は攻撃できません');
+    var targets = '<button class="primary" data-action="confirm-life-attack" data-attacker="' + attackerIndex + '">相手ライフへ攻撃</button>';
+    targets += state.battle.cpu.field.map(function (song, i) { return '<button class="secondary" data-action="confirm-song-attack" data-attacker="' + attackerIndex + '" data-index="' + i + '">' + esc(song.name) + ' · POW ' + song.currentPower + '</button>'; }).join('');
+    choose(attacker.name + ' · 攻撃先を選ぶ', targets);
   }
   function attackSong(targetIndex) {
     var ready = state.battle.user.field.map(function (s, i) { return { s:s, i:i }; }).filter(function (x) { return !x.s.attacked; });
@@ -186,7 +196,8 @@
       else if (action === 'battle') startBattle();
       else if (action === 'play') playFromHand(Number(button.dataset.index));
       else if (action === 'replace-play' || action === 'equip-play') { document.querySelector('.modal').remove(); VocaluEngine.playCard(state.battle,'user',Number(button.dataset.hand),Number(button.dataset.index));render(); }
-      else if (action === 'attack-life') attackLife(Number(button.dataset.index));
+      else if (action === 'choose-attack') chooseAttack(Number(button.dataset.index));
+      else if (action === 'confirm-life-attack') { document.querySelector('.modal').remove(); attackLife(Number(button.dataset.attacker)); }
       else if (action === 'attack-song') attackSong(Number(button.dataset.index));
       else if (action === 'confirm-song-attack') { document.querySelector('.modal').remove(); VocaluEngine.attack(state.battle,'user',Number(button.dataset.attacker),'song',Number(button.dataset.index));afterAction(); }
       else if (action === 'phase') { state.battle.phase=state.battle.phase==='main'?'attack':'main';render(); }
