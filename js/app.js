@@ -5,7 +5,7 @@
   var fatal = document.getElementById('fatal');
   var testMode = new URLSearchParams(location.search).get('test') === '1';
   var STORAGE = 'vocalu-save-v1';
-  var state = { screen: 'home', opened: [], packNo: 0, selected: [], battle: null, collection: loadCollection(), light: matchMedia('(prefers-reduced-motion: reduce)').matches, music: { ready: false, playing: false, volume: 40, title: 'BGM未再生' } };
+  var state = { screen: 'home', opened: [], packNo: 0, selected: [], battle: null, triggerResume: null, collection: loadCollection(), light: matchMedia('(prefers-reduced-motion: reduce)').matches, music: { ready: false, playing: false, volume: 40, title: 'BGM未再生' } };
   var yt = null;
 
   function loadCollection() {
@@ -34,7 +34,7 @@
   function cardHtml(card, index, selectable) {
     var chosen = state.selected.indexOf(index) >= 0;
     var power = card.type === 'song' ? card.power : card.type === 'producer' ? '+' + card.bonus : '+' + card.boost;
-    return '<article class="card ' + (chosen ? 'selected ' : '') + 'reveal"><button type="button" ' + (selectable ? 'data-action="select" data-index="' + index + '"' : 'data-action="detail" data-card="' + esc(card.id) + '"') + '><div class="card-top"><span class="cost-badge">' + card.cost + '</span><span class="rarity ' + card.rarity + '">' + card.rarity + '</span></div><div class="card-art">' + artHtml(card) + '</div><div class="card-body"><h3>' + esc(card.name) + '</h3><div class="meta"><span>' + esc(card.variant || card.type) + '</span><span>' + icon(card.type) + '</span></div><div class="card-stats"><span>COST <b>' + card.cost + '</b></span><span>' + (card.type === 'song' ? 'POWER' : 'BOOST') + ' <b>' + power + '</b></span></div></div></button></article>';
+    return '<article class="card ' + (chosen ? 'selected ' : '') + 'reveal"><button type="button" ' + (selectable ? 'data-action="select" data-index="' + index + '"' : 'data-action="detail" data-card="' + esc(card.id) + '"') + '><div class="card-top"><span class="cost-badge">' + card.cost + '</span><span class="rarity ' + card.rarity + '">' + card.rarity + '</span></div><div class="card-art">' + artHtml(card) + '</div><div class="card-body"><h3>' + esc(card.name) + '</h3><div class="meta"><span>' + (card.trigger ? '<b class="trigger-mark">TRIGGER</b>' : esc(card.variant || card.type)) + '</span><span>' + icon(card.type) + '</span></div><div class="card-stats"><span>COST <b>' + card.cost + '</b></span><span>' + (card.type === 'song' ? 'POWER' : 'BOOST') + ' <b>' + power + '</b></span></div></div></button></article>';
   }
   function render() {
     document.body.classList.toggle('light-mode', state.light);
@@ -96,9 +96,18 @@
     var userActive = b.active === 'user';
     var cpuSlots = [0,1,2].map(function (i) { return songSlot(c.field[i], i, true, false); }).join('');
     var userSlots = [0,1,2].map(function (i) { return songSlot(u.field[i], i, false, userActive); }).join('');
-    var hand = u.hand.map(function (card, i) { var value=card.type==='song'?card.power:(card.boost||card.bonus); return '<button class="hand-card" data-action="play" data-index="' + i + '" ' + (!userActive || (card.cost || 0) > u.cost ? 'disabled' : '') + '><span class="mini-cost">' + card.cost + '</span><span class="mini-art">' + artHtml(card) + '</span><b>' + esc(card.name) + '</b><small>' + (card.type==='song'?'POW ':'BOOST +') + value + '</small></button>'; }).join('');
+    var handCenter = (u.hand.length - 1) / 2;
+    var hand = u.hand.map(function (card, i) {
+      var value = card.type === 'song' ? card.power : (card.boost || card.bonus);
+      var offset = i - handCenter;
+      var angle = Math.max(-9, Math.min(9, offset * 3));
+      var lift = Math.min(14, Math.abs(offset) * 4);
+      var unavailable = !userActive || (card.cost || 0) > u.cost;
+      return '<button class="hand-card" data-action="play" data-index="' + i + '" aria-label="' + esc(card.name) + ' コスト' + card.cost + ' ' + (card.type === 'song' ? 'パワー' : 'ブースト') + value + '" style="--hand-angle:' + angle + 'deg;--hand-lift:' + lift + 'px;--hand-z:' + (20 - Math.abs(offset)) + '" ' + (unavailable ? 'disabled' : '') + '><span class="hand-card-top"><span class="mini-cost">' + card.cost + '</span><span class="hand-rarity ' + card.rarity + '">' + (card.trigger ? 'T · ' : '') + card.rarity + '</span></span><span class="mini-art">' + artHtml(card) + '</span><span class="hand-copy"><b>' + esc(card.name) + '</b><small>' + (card.type === 'song' ? 'POWER ' : 'BOOST +') + value + '</small></span></button>';
+    }).join('');
     var turnStatus = userActive ? '<span class="turn-status user-turn">YOUR TURN</span>' : '<span class="turn-status cpu-turn">CPU THINKING</span>';
-    app.innerHTML = shell('<section class="battle">' + turnStatus + '<div class="fighter"><div class="fighter-head"><span><b>CPU</b><small>HAND ' + c.hand.length + ' · DECK ' + c.deck.length + '</small></span>' + lifeCards(c.life) + '</div><div class="field">' + cpuSlots + '</div></div><div class="fighter"><div class="fighter-head"><span><b>YOU</b><small>TURN ' + b.turn + ' · COST ' + u.cost + '/' + u.maxCost + ' · DECK ' + u.deck.length + '</small></span>' + lifeCards(u.life) + '</div><div class="field">' + userSlots + '</div></div><div><small>HAND</small><div class="hand">' + hand + '</div></div><div class="log">' + b.log.slice(0,8).map(esc).join('<br>') + '</div>' + (testMode ? '<button class="secondary" data-action="test-finish">テスト: 勝利で終了</button>' : '') + '</section><div class="battle-actions"><button class="secondary" data-action="phase" ' + (!userActive ? 'disabled' : '') + '>' + (b.phase === 'main' ? '攻撃フェーズ' : 'メインフェーズ') + '</button><button class="primary" data-action="end-turn" ' + (!userActive ? 'disabled' : '') + '>ターン終了</button></div>');
+    var clutchRule = u.life === 1 ? '<div class="clutch-rule">FINAL LIFE · 召喚した楽曲はすぐ攻撃可能</div>' : '';
+    app.innerHTML = shell('<section class="battle">' + turnStatus + clutchRule + '<div class="fighter"><div class="fighter-head"><span><b>CPU</b><small>HAND ' + c.hand.length + ' · DECK ' + c.deck.length + '</small></span>' + lifeCards(c.life) + '</div><div class="field">' + cpuSlots + '</div></div><div class="fighter"><div class="fighter-head"><span><b>YOU</b><small>TURN ' + b.turn + ' · COST ' + u.cost + '/' + u.maxCost + ' · DECK ' + u.deck.length + '</small></span>' + lifeCards(u.life) + '</div><div class="field">' + userSlots + '</div></div><div class="hand-zone"><div class="hand-label"><b>HAND</b><span>' + u.hand.length + '枚 · カードをタップして使用</span></div><div class="hand">' + hand + '</div></div><div class="log">' + b.log.slice(0,8).map(esc).join('<br>') + '</div>' + (testMode ? '<button class="secondary" data-action="test-finish">テスト: 勝利で終了</button>' : '') + '</section><div class="battle-actions"><button class="secondary" data-action="phase" ' + (!userActive ? 'disabled' : '') + '>' + (b.phase === 'main' ? '攻撃フェーズ' : 'メインフェーズ') + '</button><button class="primary" data-action="end-turn" ' + (!userActive ? 'disabled' : '') + '>ターン終了</button></div>');
   }
   function choose(title, buttons, canCancel) {
     var cancel = canCancel === false ? '' : '<button class="secondary" data-action="close-modal">キャンセル</button>';
@@ -131,7 +140,20 @@
     if (!ready.length) return toast('攻撃できる楽曲がありません');
     choose('攻撃する楽曲', ready.map(function (x) { return '<button class="secondary" data-action="confirm-song-attack" data-attacker="' + x.i + '" data-index="' + targetIndex + '">' + esc(x.s.name) + ' (' + x.s.currentPower + ')</button>'; }).join(''));
   }
-  function afterAction() { if (state.battle.winner) finishBattle(); else render(); }
+  function showTriggerNotice(resume) {
+    var trigger = state.battle && state.battle.lastTrigger;
+    if (!trigger) return false;
+    state.battle.lastTrigger = null;
+    state.triggerResume = resume || null;
+    render();
+    var owner = trigger.side === 'user' ? 'あなた' : 'CPU';
+    choose('TRIGGER 発動', '<div class="trigger-reveal"><span>' + esc(owner + 'のライフ') + '</span><b>' + esc(trigger.cardName) + '</b><strong>' + esc(trigger.label) + '</strong><p>' + esc(trigger.text) + '</p></div><button class="primary" data-action="dismiss-trigger">効果を確認</button>', false);
+    return true;
+  }
+  function afterAction() {
+    if (state.battle.winner) finishBattle();
+    else if (!showTriggerNotice(null)) render();
+  }
   function finishBattle() { saveCollection(state.opened); state.screen = 'result'; render(); }
   function renderResult() {
     var win = state.battle.winner === 'user';
@@ -144,9 +166,10 @@
   function cardDetail(id) {
     var card = VocaluCatalog.cards.find(function (c) { return c.id === id; }); if (!card) return;
     var text = card.type === 'song' ? card.metricNote : (card.text || card.profile);
+    var triggerText = card.trigger ? '<div class="trigger-detail"><b>TRIGGER · ' + esc(card.trigger.label) + '</b><p>' + esc(card.trigger.text) + '</p></div>' : '';
     var sourceUrl = card.videoUrl || card.profileUrl;
     var officialLink = sourceUrl ? '<a class="official-link" href="' + esc(sourceUrl) + '" target="_blank" rel="noopener">画像・掲載元を見る</a>' : '';
-    choose(card.name, '<p>' + esc(text) + '</p>' + officialLink + '<p>所持 ' + (state.collection[id] || 0) + '枚</p>');
+    choose(card.name, '<p>' + esc(text) + '</p>' + triggerText + officialLink + '<p>所持 ' + (state.collection[id] || 0) + '枚</p>');
   }
   function toast(message) { var old = document.querySelector('.error-toast'); if (old) old.remove(); var el = document.createElement('div'); el.className = 'error-toast'; el.textContent = message; document.body.appendChild(el); setTimeout(function () { el.remove(); }, 3500); }
 
@@ -206,7 +229,8 @@
       else if (action === 'confirm-song-attack') { document.querySelector('.modal').remove(); VocaluEngine.attack(state.battle,'user',Number(button.dataset.attacker),'song',Number(button.dataset.index));afterAction(); }
       else if (action === 'phase') { state.battle.phase=state.battle.phase==='main'?'attack':'main';render(); }
       else if (action === 'end-turn') runCpuTurn();
-      else if (action === 'resolve-cpu-attack') { button.closest('.modal').remove(); VocaluEngine.attack(state.battle,'cpu',Number(button.dataset.attacker),'life',null,button.dataset.guard==='life'?null:Number(button.dataset.guard)); render(); window.setTimeout(runNextCpuAttack,state.light?20:280); }
+      else if (action === 'resolve-cpu-attack') { button.closest('.modal').remove(); VocaluEngine.attack(state.battle,'cpu',Number(button.dataset.attacker),'life',null,button.dataset.guard==='life'?null:Number(button.dataset.guard)); if(!showTriggerNotice(runNextCpuAttack)){render();window.setTimeout(runNextCpuAttack,state.light?20:280);} }
+      else if (action === 'dismiss-trigger') { button.closest('.modal').remove(); var resumeTrigger=state.triggerResume;state.triggerResume=null;if(resumeTrigger)window.setTimeout(resumeTrigger,state.light?20:280);else render(); }
       else if (action === 'close-modal') button.closest('.modal').remove();
       else if (action === 'collection') { state.screen='collection';render(); }
       else if (action === 'home') { state.screen='home';render(); }

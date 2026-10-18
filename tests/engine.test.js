@@ -12,6 +12,8 @@ assert.equal(global.VocaluCatalog.singers.length, 50, 'singer total');
 assert.equal(global.VocaluCatalog.songs.filter(c => c.thumbnailVerified).length, 200, 'all songs have verified artwork for both card variants');
 assert.equal(global.VocaluCatalog.producers.filter(c => c.thumbnailVerified && c.thumbnailUrl && c.profileUrl).length, 30, 'all producers have sourced profile artwork');
 assert.equal(global.VocaluCatalog.singers.filter(c => c.thumbnailVerified && c.thumbnailUrl && c.profileUrl).length, 50, 'all singers have sourced profile artwork');
+assert.equal(global.VocaluCatalog.producers.filter(c => c.trigger && c.trigger.type).length, 30, 'all producers have triggers');
+assert.equal(global.VocaluCatalog.singers.filter(c => c.trigger && c.trigger.type).length, 50, 'all singers have triggers');
 assert.ok(global.VocaluCatalog.songs.find(c => c.name === 'ローリンガール').videoUrl.includes('vnw8zURAxkU'));
 assert.ok(global.VocaluCatalog.producers.find(c => c.name === 'じん').thumbnailUrl.includes('/552.jpg'), 'Jin uses the verified producer profile');
 assert.ok(global.VocaluCatalog.producers.find(c => c.name === 'minato').thumbnailUrl.includes('/17.jpg'), 'minato uses the verified producer profile');
@@ -85,5 +87,42 @@ replacement.user.cost = 10;
 E.playCard(replacement,'user',0,1);
 assert.equal(replacement.user.field.length,3,'replacement keeps field at three');
 assert.equal(replacement.user.discard.length,1,'replaced song goes to discard');
+
+const clutch = E.makeBattle(strongDeck, weakDeck, () => 0.1);
+clutch.user.life = 1;
+clutch.user.cost = 10;
+clutch.user.hand = [{...strongDeck[0],cost:1}];
+E.playCard(clutch,'user',0,0);
+assert.equal(clutch.user.field[0].attacked,false,'songs summoned at one life can attack immediately');
+
+function makeTriggerBattle(type) {
+  const support = global.VocaluCatalog.cards.find(c => c.type !== 'song' && c.trigger.type === type);
+  const state = E.makeBattle(strongDeck, weakDeck, () => 0.1);
+  state.cpu.life = 2;
+  state.cpu.lifeCards = [{...support}];
+  state.user.field = [
+    {...strongDeck[0],cost:6,currentPower:9000,attacked:false},
+    {...strongDeck[1],cost:5,currentPower:8000,attacked:false},
+    {...strongDeck[2],cost:4,currentPower:7000,attacked:false}
+  ];
+  E.attack(state,'user',0,'life',null,null);
+  assert.equal(state.cpu.life,1,type + ' trigger damage resolves');
+  assert.equal(state.cpu.discard.some(c => c.id === support.id),true,type + ' life support enters discard');
+  assert.equal(state.lastTrigger.type,type,type + ' trigger is reported to the UI');
+  return state;
+}
+
+const destroyTrigger = makeTriggerBattle('destroy_all');
+assert.equal(destroyTrigger.user.field.length,0,'destroy-all trigger clears the attacking field');
+
+const costTrigger = makeTriggerBattle('cost_limit');
+assert.ok(costTrigger.user.field.reduce((sum,c) => sum + c.cost,0) <= 10,'cost-limit trigger reduces field cost to ten or less');
+
+const bounceTrigger = makeTriggerBattle('bounce');
+assert.equal(bounceTrigger.user.field.length,2,'bounce trigger removes one field card');
+assert.equal(bounceTrigger.user.hand.some(c => c.currentPower === 9000),true,'bounce trigger returns the strongest card to hand');
+
+const stopTrigger = makeTriggerBattle('stop_attacks');
+assert.equal(stopTrigger.user.field.every(c => c.attacked),true,'stop trigger prevents all remaining attacks this turn');
 
 console.log('VOCALU engine tests: OK');

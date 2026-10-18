@@ -101,11 +101,11 @@
       p.hand.splice(handIndex, 1);
       var song = clone(card);
       song.currentPower = song.power;
-      song.attacked = true;
+      song.attacked = p.life !== 1;
       song.singer = null;
       if (p.field.length >= 3) p.discard.push(p.field.splice(replaceIndex, 1)[0]);
       p.field.push(song);
-      state.log.unshift(card.name + ' を召喚');
+      state.log.unshift(card.name + ' を召喚' + (p.life === 1 ? ' · ライフ1で即攻撃可能' : ''));
     } else if (card.type === 'producer') {
       if (p.producerUsed) throw new Error('ボカロPは1ターンに1枚までです');
       p.cost -= card.cost;
@@ -152,13 +152,55 @@
         state.log.unshift(guard.name + ' でガード');
       } else {
         enemy.life -= 1;
-        if (enemy.lifeCards && enemy.lifeCards.length) enemy.lifeCards.pop();
+        resolveLifeCard(state, side === 'user' ? 'cpu' : 'user', side);
         state.log.unshift(attacker.name + ' がライフへ攻撃');
         if (enemy.life <= 0) state.winner = side;
       }
     }
     bump(state);
     return state;
+  }
+
+  function resolveLifeCard(state, defendingSide, attackingSide) {
+    var defender = state[defendingSide];
+    var attacker = state[attackingSide];
+    if (!defender.lifeCards || !defender.lifeCards.length) return null;
+    var lifeCard = defender.lifeCards.pop();
+    defender.discard.push(lifeCard);
+    if (defender.life <= 0 || lifeCard.type === 'song' || !lifeCard.trigger) return null;
+
+    var effect = lifeCard.trigger.type;
+    if (effect === 'destroy_all') {
+      while (attacker.field.length) attacker.discard.push(attacker.field.pop());
+    } else if (effect === 'cost_limit') {
+      while (fieldCost(attacker.field) > 10 && attacker.field.length) {
+        var highestCost = 0;
+        for (var i = 1; i < attacker.field.length; i += 1) {
+          if ((attacker.field[i].cost || 0) > (attacker.field[highestCost].cost || 0)) highestCost = i;
+        }
+        attacker.discard.push(attacker.field.splice(highestCost, 1)[0]);
+      }
+    } else if (effect === 'bounce') {
+      if (attacker.field.length) {
+        var highestPower = 0;
+        for (var j = 1; j < attacker.field.length; j += 1) {
+          if ((attacker.field[j].currentPower || 0) > (attacker.field[highestPower].currentPower || 0)) highestPower = j;
+        }
+        var returned = attacker.field.splice(highestPower, 1)[0];
+        returned.attacked = true;
+        attacker.hand.push(returned);
+      }
+    } else if (effect === 'stop_attacks') {
+      attacker.field.forEach(function (song) { song.attacked = true; });
+    }
+
+    state.lastTrigger = { side: defendingSide, cardName: lifeCard.name, label: lifeCard.trigger.label, text: lifeCard.trigger.text, type: effect };
+    state.log.unshift('TRIGGER · ' + lifeCard.name + '「' + lifeCard.trigger.label + '」');
+    return state.lastTrigger;
+  }
+
+  function fieldCost(field) {
+    return field.reduce(function (total, card) { return total + (card.cost || 0); }, 0);
   }
 
   function endTurn(state, side) {

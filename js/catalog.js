@@ -90,6 +90,13 @@
   }
   function powerFor(index) { return 1000 + ((index * 7) % 19) * 500; }
   function songCost(power) { return Math.max(1, Math.min(10, Math.ceil(power / 1500))); }
+  var triggerEffects = [
+    { type:'destroy_all', label:'ステージリセット', text:'相手の場の楽曲をすべて破壊する。' },
+    { type:'cost_limit', label:'コストオーバー', text:'相手の場を合計コスト10以下になるまで、高コスト順に破壊する。' },
+    { type:'bounce', label:'リテイク', text:'相手の場で最もパワーが高い楽曲1枚を手札へ戻す。' },
+    { type:'stop_attacks', label:'ブレイクタイム', text:'相手の場の楽曲は、このターンこれ以上攻撃できない。' }
+  ];
+  function triggerFor(index, offset) { return triggerEffects[(index + offset) % triggerEffects.length]; }
 
   var songs = [];
   rawSongs.forEach(function (line, index) {
@@ -122,11 +129,11 @@
 
   var producers = producerNames.map(function (name, index) {
     var profile = producerProfiles[name];
-    return { id: 'producer-' + String(index + 1).padStart(2, '0'), type: 'producer', name: name, rarity: rarityFor(index + 40), cost: 1 + index % 3, bonus: 500 + index % 4 * 500, text: '自分の楽曲を強化。制作楽曲が場にあると効果が2倍。', thumbnailUrl: profile.image, thumbnailVerified: true, profileUrl: profile.source, mediaSource: profile.label, mediaVerifiedAt: '2026-10-17' };
+    return { id: 'producer-' + String(index + 1).padStart(2, '0'), type: 'producer', name: name, rarity: rarityFor(index + 40), cost: 1 + index % 3, bonus: 500 + index % 4 * 500, text: '自分の楽曲を強化。制作楽曲が場にあると効果が2倍。', trigger: triggerFor(index, 0), thumbnailUrl: profile.image, thumbnailVerified: true, profileUrl: profile.source, mediaSource: profile.label, mediaVerifiedAt: '2026-10-17' };
   });
   var singers = singerNames.map(function (name, index) {
     var profile = singerProfiles[name];
-    return { id: 'singer-' + String(index + 1).padStart(2, '0'), type: 'singer', name: name, rarity: rarityFor(index + 70), cost: 1 + index % 3, boost: 500 + index % 5 * 500, profile: '楽曲に装備し、歌声の個性でパワーを加えるサポートカード。', thumbnailUrl: profile.image, thumbnailVerified: true, profileUrl: profile.source, mediaSource: profile.label, mediaVerifiedAt: '2026-10-17' };
+    return { id: 'singer-' + String(index + 1).padStart(2, '0'), type: 'singer', name: name, rarity: rarityFor(index + 70), cost: 1 + index % 3, boost: 500 + index % 5 * 500, profile: '楽曲に装備し、歌声の個性でパワーを加えるサポートカード。', trigger: triggerFor(index, 2), thumbnailUrl: profile.image, thumbnailVerified: true, profileUrl: profile.source, mediaSource: profile.label, mediaVerifiedAt: '2026-10-17' };
   });
 
   var catalog = songs.concat(producers, singers);
