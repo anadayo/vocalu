@@ -123,9 +123,9 @@
     return '<div class="battle-slot ' + (selected?'selected ':'') + (target?'targetable ':'') + (song.attacked?'used':'') + '"><button class="slot-card" data-action="select-unit" data-side="' + side + '" data-index="' + index + '">' + cardFace(song,true) + '</button><span class="battle-power ' + (song.attacked?'rest':'active') + '"><small>' + (song.attacked?'REST -1000':'POWER') + '</small><b>' + power + '</b></span><button class="inspect" data-action="battle-detail" data-side="' + side + '" data-index="' + index + '" aria-label="詳細">⌕</button></div>';
   }
   function lifeCards(player,side) { var cards='';for(var i=0;i<player.life;i+=1)cards+='<span class="life-card">V</span>';return '<button class="life-target ' + (side==='cpu'&&state.targeting!=null?'targetable':'') + '" ' + (side==='cpu'&&state.targeting!=null?'data-action="attack-life"':'disabled') + '><b>LIFE ' + player.life + '</b><span class="life-cards">' + cards + '</span></button>'; }
-  function pileHtml(player,side,showEndTurn){
-    var turnButton=showEndTurn?'<button class="pile-end-turn" data-action="end-turn" ' + (state.battle.active!=='user'?'disabled':'') + '>ターン<br>終了</button>':'<span class="pile-spacer" aria-hidden="true"></span>';
-    return '<div class="pile-zone ' + side + '">' + turnButton + '<div class="pile-card drop"><span>DROP</span><b>' + player.discard.length + '</b></div><div class="pile-card deck"><span>DECK</span><b>' + player.deck.length + '</b></div></div>';
+  function pileHtml(player,side){
+    var recent=player.discard.slice(-3).reverse(),dropCards=recent.map(function(card,index){return '<i class="discard-preview-card" style="--drop-index:' + index + '">' + artHtml(card) + '</i>';}).join('');
+    return '<div class="pile-zone ' + side + '"><button class="pile-card drop" data-action="show-discard" data-side="' + side + '" aria-label="' + (side==='user'?'あなた':'CPU') + 'のドロップを見る"><span>DROP</span><span class="discard-stack">' + (dropCards||'<i class="discard-empty">EMPTY</i>') + '</span></button><div class="pile-card deck"><span>DECK</span><span class="deck-back"><b>ボカる！</b><small>VOCALU</small></span><em>' + player.deck.length + '</em></div></div>';
   }
   function leekMeter(player){var leaves='';for(var i=0;i<player.maxCost;i+=1)leaves+='<i class="leek-icon ' + (i<player.cost?'ready':'spent') + '"></i>';return '<div class="leek-meter"><span>葱 COST</span><b>' + player.cost + '/' + player.maxCost + '</b><div>' + leaves + '</div></div>';}
   function compactHand(player,side){
@@ -136,6 +136,10 @@
   function playerStrip(player,side){
     var name=side==='cpu'?'STUDIO CPU':'YOU',label=side==='cpu'?'OPPONENT':'PLAYER';
     return '<div class="player-strip ' + side + '"><div class="player-meta"><b>' + name + '</b><small>' + label + '</small></div>' + leekMeter(player) + compactHand(player,side) + '</div>';
+  }
+  function lifeRail(player,side){
+    var name=side==='cpu'?'CPU':'YOU';
+    return '<div class="life-rail ' + side + '"><div class="rail-player"><b>' + name + '</b><span><i class="mini-leek"></i>' + player.cost + '/' + player.maxCost + '</span></div>' + lifeCards(player,side) + '</div>';
   }
   function handHtml(card,i,total,userActive,cost) {
     var offset=i-(total-1)/2,angle=Math.max(-9,Math.min(9,offset*3)),lift=Math.min(14,Math.abs(offset)*4),unavailable=!userActive||(card.cost||0)>cost;
@@ -157,9 +161,9 @@
     var targeting=state.targeting!=null?'<div class="target-guide">点線の先にある対象をタップ<span class="attack-arrow">↑</span><button data-action="cancel-action">取消</button></div><div class="attack-vector"><i></i></div>':'';
     var impactHtml=impact?'<div class="impact-effect ' + impact.type + '"><b>' + (impact.type==='life'?'LIFE BREAK':'KNOCKOUT') + '</b></div>':'';
     var board='<section class="battle-center"><header class="battle-status"><span>TURN ' + b.turn + '</span><b class="' + (userActive?'user-turn':'cpu-turn') + '">' + (userActive?'YOUR TURN':'CPU TURN') + '</b><span>' + difficultyName() + '</span></header>' + targeting
-      + '<div class="battle-zone player-row enemy">' + lifeCards(c,'cpu') + '<div class="battle-core">' + playerStrip(c,'cpu') + '<div class="battle-field enemy-field">' + cpuSlots + '</div></div>' + pileHtml(c,'cpu',false) + '</div>'
-      + '<div class="stage-line"><span>VOCALU STAGE</span></div>'
-      + '<div class="battle-zone player-row user">' + lifeCards(u,'user') + '<div class="battle-core"><div class="battle-field user-field">' + userSlots + '</div>' + playerStrip(u,'user') + '</div>' + pileHtml(u,'user',true) + '</div>'
+      + '<div class="battle-zone player-row enemy mirrored">' + pileHtml(c,'cpu') + '<div class="battle-core">' + compactHand(c,'cpu') + '<div class="battle-field enemy-field">' + cpuSlots + '</div></div>' + lifeRail(c,'cpu') + '</div>'
+      + '<div class="stage-line"><span>VOCALU STAGE</span><button class="stage-end-turn" data-action="end-turn" ' + (userActive?'':'disabled') + '>ターン終了</button></div>'
+      + '<div class="battle-zone player-row user">' + lifeRail(u,'user') + '<div class="battle-core"><div class="battle-field user-field">' + userSlots + '</div></div>' + pileHtml(u,'user') + '</div>'
       + (u.life<=2?'<div class="clutch-rule">LIFE 2 OR LESS · 召喚した楽曲はすぐ攻撃可能</div>':'') + '<div class="hand-zone"><div class="hand-label"><b>HAND</b><span>' + u.hand.length + ' CARDS</span></div><div class="hand">' + hand + '</div></div>' + impactHtml + '</section>';
     app.innerHTML=shell(board+actionPanel(),true);
   }
@@ -174,6 +178,7 @@
   function detailContent(card){var text=card.type==='song'?card.metricNote:(card.text||card.profile);var trigger=card.trigger?'<div class="trigger-detail"><b>TRIGGER · ' + esc(card.trigger.label) + '</b><p>' + esc(card.trigger.text) + '</p></div>':'';var equip=card.singer?'<div class="equipment-detail"><h3>装備中の歌い手</h3>' + cardFace(card.singer,false) + '<p>POWER +' + card.singer.boost + '</p></div>':'';var source=card.videoUrl||card.profileUrl;return '<div class="detail-card">' + cardFace(card,false) + '</div><p>' + esc(text) + '</p>' + trigger + equip + (source?'<a class="official-link" href="' + esc(source) + '" target="_blank" rel="noopener">掲載元を見る</a>':'');}
   function cardDetail(id){var card=VocaluCatalog.cards.find(function(c){return c.id===id;});if(card)choose(card.name,detailContent(card)+'<p>所持 ' + (state.collection[id]||0) + '枚</p>');}
   function battleDetail(side,index){var card=state.battle[side].field[index];if(card)choose(card.name,detailContent(card));}
+  function showDiscard(side){var cards=state.battle[side].discard.slice().reverse();var title=(side==='user'?'あなた':'CPU')+'のDROP';var content=cards.length?'<div class="discard-history">' + cards.map(function(card){return '<button data-action="discard-detail" data-card="' + esc(card.id) + '">' + cardFace(card,false) + '</button>';}).join('') + '</div>':'<p class="notice">まだ使われたカードはありません。</p>';choose(title,content);}
   function toast(message){var old=document.querySelector('.error-toast');if(old)old.remove();var el=document.createElement('div');el.className='error-toast';el.textContent=message;document.body.appendChild(el);setTimeout(function(){el.remove();},3500);}
   function initMusic(){if(yt&&state.music.ready){state.music.playing?yt.pauseVideo():yt.playVideo();return;}state.music.title='YouTubeを接続中';render();window.onYouTubeIframeAPIReady=function(){try{yt=new YT.Player('yt-player',{height:'1',width:'1',playerVars:{listType:'playlist',list:'PL4hnIvXd3nC4mvwumy4IFfY4d8vVmcVGA',playsinline:1,controls:0},events:{onReady:function(e){state.music.ready=true;e.target.setVolume(state.music.volume);e.target.playVideo();},onStateChange:function(e){state.music.playing=e.data===1;try{state.music.title=e.target.getVideoData().title||'VOCALU BGM';}catch(ignore){}render();},onError:function(){toast('BGMを読み込めませんでした。');}}});}catch(err){toast('BGMの初期化に失敗しました。');}};if(!document.getElementById('youtube-api')){var s=document.createElement('script');s.id='youtube-api';s.src='https://www.youtube.com/iframe_api';document.head.appendChild(s);}}
   function musicControls(){if(!state.music.ready)initMusic();choose('BGM','<p>' + esc(state.music.title) + '</p><button class="secondary" data-action="music-prev">前の曲</button><button class="secondary" data-action="music-toggle">再生 / 停止</button><button class="secondary" data-action="music-next">次の曲</button><button class="secondary" data-action="music-down">音量 -</button><button class="secondary" data-action="music-up">音量 +</button><p>音量 ' + state.music.volume + '</p>');}
@@ -205,6 +210,8 @@
     else if(action==='cancel-action'){state.targeting=null;state.selectedUnit=null;render();}
     else if(action==='panel-tab'){state.panelTab=button.dataset.tab;render();}
     else if(action==='battle-detail')battleDetail(button.dataset.side,Number(button.dataset.index));
+    else if(action==='show-discard')showDiscard(button.dataset.side);
+    else if(action==='discard-detail'){button.closest('.modal').remove();cardDetail(button.dataset.card);}
     else if(action==='battle-settings')battleSettings();
     else if(action==='battle-log')battleLog();
     else if(action==='battle-toggle-light'){button.closest('.modal').remove();state.light=!state.light;render();}
