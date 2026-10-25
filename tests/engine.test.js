@@ -83,8 +83,10 @@ restedGuard.cpu.field.push({...weakDeck[0],currentPower:1500,attacked:false});
 restedGuard.user.field.push({...strongDeck[0],currentPower:2000,attacked:true});
 restedGuard.active = 'cpu';
 assert.equal(E.effectivePower(restedGuard.user.field[0]),1000,'REST subtracts 1000 from displayed and combat power');
-assert.throws(()=>E.attack(restedGuard,'cpu',0,'life',null,0),/REST状態/,'a REST card cannot guard life');
-assert.equal(restedGuard.cpu.field[0].attacked,false,'an invalid REST guard does not consume the attack');
+E.attack(restedGuard,'cpu',0,'life',null,0);
+assert.equal(restedGuard.user.life,5,'a REST card can guard an attack aimed at life');
+assert.equal(restedGuard.user.field.length,0,'REST power penalty applies when guarding life');
+assert.equal(restedGuard.cpu.field.length,1,'the attacker survives the weaker REST life guard');
 
 const intercept = E.makeBattle(strongDeck, weakDeck, () => 0.1);
 intercept.cpu.field.push({...weakDeck[0],currentPower:1500,attacked:false});
@@ -94,6 +96,13 @@ E.attack(intercept,'cpu',0,'song',0,1);
 assert.equal(intercept.user.field.some(c=>c.currentPower===3000),true,'an ACTIVE card can protect a targeted REST card');
 assert.equal(intercept.user.discard.some(c=>c.currentPower===1000),true,'the ACTIVE guard receives the attack');
 assert.equal(intercept.lastImpact.type,'knockout','destroying a battle card exposes the knockout animation state');
+
+const restedIntercept = E.makeBattle(strongDeck, weakDeck, () => 0.1);
+restedIntercept.cpu.field.push({...weakDeck[0],currentPower:1500,attacked:false});
+restedIntercept.user.field.push({...strongDeck[0],currentPower:3000,attacked:true},{...strongDeck[1],currentPower:2000,attacked:true});
+restedIntercept.active = 'cpu';
+assert.throws(()=>E.attack(restedIntercept,'cpu',0,'song',0,1),/REST状態/,'another REST card cannot protect a targeted REST card');
+assert.equal(restedIntercept.cpu.field[0].attacked,false,'an invalid REST intercept does not consume the attack');
 
 const cpuMain = E.makeBattle(strongDeck, weakDeck, () => 0.1);
 E.endTurn(cpuMain,'user');

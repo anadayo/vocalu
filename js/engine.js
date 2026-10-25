@@ -165,9 +165,11 @@
     var enemy = state[side === 'user' ? 'cpu' : 'user'];
     var attacker = p.field[attackerIndex];
     if (!attacker || attacker.attacked) throw new Error('この楽曲は攻撃できません');
-    if (guardIndex != null && (targetType !== 'song' || guardIndex !== targetIndex)) {
+    if (guardIndex != null && targetType === 'song' && guardIndex !== targetIndex) {
       if (!enemy.field[guardIndex]) throw new Error('ガードする楽曲が見つかりません');
       if (enemy.field[guardIndex].attacked) throw new Error('REST状態の楽曲はガードできません');
+    } else if (guardIndex != null && targetType === 'life' && !enemy.field[guardIndex]) {
+      throw new Error('ガードする楽曲が見つかりません');
     }
     var attackPower = attacker.currentPower;
     attacker.attacked = true;
@@ -196,7 +198,7 @@
           state.lastImpact = { type: 'knockout', side: side === 'user' ? 'cpu' : 'user' };
         }
         if (attackPower <= guardPower) p.discard.push(p.field.splice(attackerIndex, 1)[0]);
-        state.log.unshift(guard.name + ' でACTIVEガード');
+        state.log.unshift(guard.name + ' でライフをガード' + (guard.attacked ? ' · REST補正 -1000' : ''));
       } else {
         enemy.life -= 1;
         state.lastImpact = { type: 'life', side: side === 'user' ? 'cpu' : 'user' };
