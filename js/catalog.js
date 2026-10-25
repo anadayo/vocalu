@@ -98,7 +98,7 @@
     'チュルリラ・チュルリラ・ダッダッダ！':'_j0kfGNwIlw','ブリキノダンス':'6EuR6FuOXXw','脳漿炸裂ガール':'Ey_NHZNYTeE','聖槍爆裂ボーイ':'MqNmKnCNLyM','夜咄ディセイブ':'aPDaFGqMX4I',
     'チルドレンレコード':'8xR6zghZM1c','アウターサイエンス':'HswIHVN5D4o','如月アテンション':'-y3BSoHOT9A','独りんぼエンヴィー':'PXZmn1nf-7Q','心做し':'3SkNrZnoK5w',
     '炉心融解':'dSw8CucthGc','右肩の蝶':'HhOK1-whpsc','悪ノ娘':'sV7ODBvxw38','悪ノ召使':'GC6YNb6ZLKg','深海少女':'2CwBFr-Eoxg',
-    '1925':'QvGLt5CUBVo','ダブルラリアット':'hC8KrIY8qT4','Just Be Friends':'li1WjKl2boY'
+    '1925':'QvGLt5CUBVo','ダブルラリアット':'hC8KrIY8qT4','Just Be Friends':'li1WjKl2boY','零号':'OSzvgljQ_3I'
   };
 
   // YouTubeに制作者本人の原曲投稿がない作品は、本人投稿または公式配信の画像を使う。
@@ -134,6 +134,7 @@
     var basePower = powerFor(index);
     var videoId = verifiedVideos[parts[0]] || null;
     var artwork = verifiedArtwork[parts[0]] || null;
+    var syncedMedia = root.VocaluSongMedia && root.VocaluSongMedia['song-' + String(index + 1).padStart(3, '0')] || null;
     songs.push({
         id: 'song-' + String(index + 1).padStart(3, '0'),
         type: 'song',
@@ -144,12 +145,12 @@
         cost: songCost(basePower),
         viewCount: null,
         viewCountVerifiedAt: null,
-        videoUrl: videoId ? 'https://www.youtube.com/watch?v=' + videoId : artwork ? artwork.url : null,
-        thumbnailUrl: videoId ? 'https://i.ytimg.com/vi/' + videoId + '/hqdefault.jpg' : artwork ? artwork.thumb : null,
-        thumbnailVerified: Boolean(videoId || artwork),
-        mediaVerifiedAt: videoId || artwork ? '2026-10-17' : null,
-        mediaSource: videoId ? 'YouTube公式投稿' : artwork ? artwork.source : null,
-        metricNote: videoId || artwork ? '作品と投稿元を確認済み。再生数と対戦値の同期は準備中です。' : '公式画像は確認待ち。対戦値はテスト用バランス値です。'
+        videoUrl: videoId ? 'https://www.youtube.com/watch?v=' + videoId : artwork ? artwork.url : syncedMedia ? syncedMedia.mediaUrl : null,
+        thumbnailUrl: videoId ? 'https://i.ytimg.com/vi/' + videoId + '/hqdefault.jpg' : artwork ? artwork.thumb : syncedMedia ? syncedMedia.image : null,
+        thumbnailVerified: Boolean(videoId || artwork || syncedMedia),
+        mediaVerifiedAt: videoId || artwork ? '2026-10-17' : syncedMedia ? syncedMedia.verifiedAt : null,
+        mediaSource: videoId ? 'YouTube公式投稿' : artwork ? artwork.source : syncedMedia ? syncedMedia.sourceLabel : null,
+        metricNote: videoId || artwork || syncedMedia ? '作品と投稿元を確認済み。再生数と対戦値の同期は準備中です。' : '公式画像は確認待ち。対戦値はテスト用バランス値です。'
       });
   });
 

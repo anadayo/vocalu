@@ -74,7 +74,7 @@
   }
   function renderHome() {
     var owned = Object.keys(state.collection).filter(function (id) { return state.collection[id] > 0; }).length;
-    app.innerHTML = shell('<section class="hero"><span class="eyebrow">DIGITAL TCG</span><h1>開けて、組んで、歌わせる。</h1><p>5パックから生まれる20枚デッキで、すぐにCPUバトル。</p></section><div class="status-grid"><div class="stat"><b>300</b><small>カード</small></div><div class="stat"><b>' + owned + '</b><small>図鑑</small></div><div class="stat"><b>5</b><small>ライフ</small></div></div><div class="actions"><button class="primary" data-action="start">5パック開封を始める</button><button class="secondary" data-action="collection">コレクション</button><button class="secondary" data-action="toggle-light">軽量モード ' + (state.light ? 'ON' : 'OFF') + '</button></div><p class="notice">掲載元を確認できた画像だけを表示します。未確認作品にはVOCALU独自カバーを使用しています。</p>' + testPanel());
+    app.innerHTML = shell('<section class="hero"><span class="eyebrow">DIGITAL TCG</span><h1>開けて、組んで、歌わせる。</h1><p>5パックから生まれる20枚デッキで、すぐにCPUバトル。</p></section><div class="status-grid"><div class="stat"><b>300</b><small>カード</small></div><div class="stat"><b>' + owned + '</b><small>図鑑</small></div><div class="stat"><b>5</b><small>ライフ</small></div></div><div class="actions"><button class="primary" data-action="start">5パック開封を始める</button><button class="secondary" data-action="collection">コレクション</button><button class="secondary" data-action="toggle-light">軽量モード ' + (state.light ? 'ON' : 'OFF') + '</button></div><p class="notice">全300枚の画像と掲載元を確認済みです。楽曲情報はVocaDBと公式投稿を照合しています。</p>' + testPanel());
   }
   function testPanel() {
     if (!testMode) return '';

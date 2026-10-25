@@ -1,6 +1,7 @@
 'use strict';
 const assert = require('assert');
 global.self = global;
+require('../js/song-media.js');
 require('../js/catalog.js');
 const E = require('../js/engine.js');
 
@@ -13,6 +14,7 @@ assert.equal(new Set(global.VocaluCatalog.songs.map(c => c.name)).size, 240, 'so
 assert.equal(global.VocaluCatalog.cards.some(c => c.variant === 'コレクター版' || /-sp$/.test(c.id)), false, 'collector cards are removed');
 assert.equal(global.VocaluCatalog.producers.filter(c => c.thumbnailVerified && c.thumbnailUrl && c.profileUrl).length, 20, 'all producers have sourced profile artwork');
 assert.equal(global.VocaluCatalog.singers.filter(c => c.thumbnailVerified && c.thumbnailUrl && c.profileUrl).length, 40, 'all singers have sourced profile artwork');
+assert.equal(global.VocaluCatalog.cards.filter(c => c.thumbnailVerified && c.thumbnailUrl).length, 300, 'all cards have verified artwork');
 assert.equal(global.VocaluCatalog.producers.filter(c => c.trigger && c.trigger.type).length, 20, 'all producers have triggers');
 assert.equal(global.VocaluCatalog.singers.filter(c => c.trigger && c.trigger.type).length, 40, 'all singers have triggers');
 assert.deepEqual(global.VocaluCatalog.songs.reduce((a,c)=>(a[c.rarity]=(a[c.rarity]||0)+1,a),{}), {N:100,R:80,SR:45,UR:15});
