@@ -123,8 +123,20 @@
     return '<div class="battle-slot ' + (selected?'selected ':'') + (target?'targetable ':'') + (song.attacked?'used':'') + '"><button class="slot-card" data-action="select-unit" data-side="' + side + '" data-index="' + index + '">' + cardFace(song,true) + '</button><span class="battle-power ' + (song.attacked?'rest':'active') + '"><small>' + (song.attacked?'REST -1000':'POWER') + '</small><b>' + power + '</b></span><button class="inspect" data-action="battle-detail" data-side="' + side + '" data-index="' + index + '" aria-label="詳細">⌕</button></div>';
   }
   function lifeCards(player,side) { var cards='';for(var i=0;i<player.life;i+=1)cards+='<span class="life-card">V</span>';return '<button class="life-target ' + (side==='cpu'&&state.targeting!=null?'targetable':'') + '" ' + (side==='cpu'&&state.targeting!=null?'data-action="attack-life"':'disabled') + '><b>LIFE ' + player.life + '</b><span class="life-cards">' + cards + '</span></button>'; }
-  function pileHtml(player,side){return '<div class="pile-zone ' + side + '"><div><span>DECK</span><b>' + player.deck.length + '</b></div><div><span>DROP</span><b>' + player.discard.length + '</b></div></div>';}
+  function pileHtml(player,side,showEndTurn){
+    var turnButton=showEndTurn?'<button class="pile-end-turn" data-action="end-turn" ' + (state.battle.active!=='user'?'disabled':'') + '>ターン<br>終了</button>':'<span class="pile-spacer" aria-hidden="true"></span>';
+    return '<div class="pile-zone ' + side + '">' + turnButton + '<div class="pile-card drop"><span>DROP</span><b>' + player.discard.length + '</b></div><div class="pile-card deck"><span>DECK</span><b>' + player.deck.length + '</b></div></div>';
+  }
   function leekMeter(player){var leaves='';for(var i=0;i<player.maxCost;i+=1)leaves+='<i class="leek-icon ' + (i<player.cost?'ready':'spent') + '"></i>';return '<div class="leek-meter"><span>葱 COST</span><b>' + player.cost + '/' + player.maxCost + '</b><div>' + leaves + '</div></div>';}
+  function compactHand(player,side){
+    var cards='';
+    if(side==='cpu')for(var i=0;i<player.hand.length;i+=1)cards+='<i class="hidden-hand-card">V</i>';
+    return '<div class="compact-hand ' + side + '-hand"><span>HAND</span><b>' + player.hand.length + '</b>' + (cards?'<div>' + cards + '</div>':'') + '</div>';
+  }
+  function playerStrip(player,side){
+    var name=side==='cpu'?'STUDIO CPU':'YOU',label=side==='cpu'?'OPPONENT':'PLAYER';
+    return '<div class="player-strip ' + side + '"><div class="player-meta"><b>' + name + '</b><small>' + label + '</small></div>' + leekMeter(player) + compactHand(player,side) + '</div>';
+  }
   function handHtml(card,i,total,userActive,cost) {
     var offset=i-(total-1)/2,angle=Math.max(-9,Math.min(9,offset*3)),lift=Math.min(14,Math.abs(offset)*4),unavailable=!userActive||(card.cost||0)>cost;
     return '<button class="hand-card" data-action="play" data-index="' + i + '" style="--hand-angle:' + angle + 'deg;--hand-lift:' + lift + 'px;--hand-z:' + (20-Math.abs(offset)) + '" ' + (unavailable?'disabled':'') + '>' + cardFace(card,true) + '</button>';
@@ -134,7 +146,7 @@
     var card=selectedCard(), tabs='<div class="panel-tabs"><button data-action="panel-tab" data-tab="action" class="' + (state.panelTab==='action'?'active':'') + '">ACTION</button><button data-action="panel-tab" data-tab="detail" class="' + (state.panelTab==='detail'?'active':'') + '">DETAIL</button></div>',body='';
     if(state.panelTab==='detail')body=card?'<div class="panel-card">' + cardFace(card,false) + '<p>' + esc(card.metricNote||'現在パワーや装備効果を含む状態です。') + '</p></div>':'<p class="panel-empty">盤面のカードを選択してください。</p>';
     else body=card&&state.selectedUnit.side==='user'?'<div class="panel-card-name"><b>' + esc(card.name) + '</b><span>' + (card.attacked?'REST · 攻撃不可':'ACTIVE · 攻撃先をタップ') + ' · POWER ' + VocaluEngine.effectivePower(card) + '</span></div><button class="secondary" data-action="battle-detail" data-side="user" data-index="' + state.selectedUnit.index + '">詳細</button><button class="secondary" data-action="cancel-action">取消</button>':'<p class="panel-empty">ACTIVEの楽曲をタップし、点線の先にある攻撃対象を選択します。</p>';
-    return '<aside class="action-panel">' + tabs + '<div class="panel-body">' + body + '</div><button class="end-turn" data-action="end-turn" ' + (state.battle.active!=='user'?'disabled':'') + '>ターン終了</button></aside>';
+    return '<aside class="action-panel">' + tabs + '<div class="panel-body">' + body + '</div></aside>';
   }
   function renderBattle() {
     var b=state.battle,u=b.user,c=b.cpu,userActive=b.active==='user';
@@ -144,7 +156,11 @@
     var hand=u.hand.map(function(card,i){return handHtml(card,i,u.hand.length,userActive,u.cost);}).join('');
     var targeting=state.targeting!=null?'<div class="target-guide">点線の先にある対象をタップ<span class="attack-arrow">↑</span><button data-action="cancel-action">取消</button></div><div class="attack-vector"><i></i></div>':'';
     var impactHtml=impact?'<div class="impact-effect ' + impact.type + '"><b>' + (impact.type==='life'?'LIFE BREAK':'KNOCKOUT') + '</b></div>':'';
-    var board='<section class="battle-center"><header class="battle-status"><span>TURN ' + b.turn + '</span><b class="' + (userActive?'user-turn':'cpu-turn') + '">' + (userActive?'YOUR TURN':'CPU TURN') + '</b><span>' + difficultyName() + '</span></header>' + targeting + '<div class="player-row enemy">' + pileHtml(c,'cpu') + '<div class="player-meta"><b>STUDIO CPU</b><small>OPPONENT</small></div>' + lifeCards(c,'cpu') + '</div><div class="battle-field enemy-field">' + cpuSlots + '</div><div class="stage-line"><span>VOCALU STAGE</span></div><div class="battle-field user-field">' + userSlots + '</div><div class="player-row user">' + lifeCards(u,'user') + '<div class="player-meta"><b>YOU</b><small>PLAYER</small></div>' + pileHtml(u,'user') + '</div>' + leekMeter(u) + (u.life<=2?'<div class="clutch-rule">LIFE 2 OR LESS · 召喚した楽曲はすぐ攻撃可能</div>':'') + '<div class="hand-zone"><div class="hand-label"><b>HAND</b><span>' + u.hand.length + ' CARDS</span></div><div class="hand">' + hand + '</div></div>' + impactHtml + '</section>';
+    var board='<section class="battle-center"><header class="battle-status"><span>TURN ' + b.turn + '</span><b class="' + (userActive?'user-turn':'cpu-turn') + '">' + (userActive?'YOUR TURN':'CPU TURN') + '</b><span>' + difficultyName() + '</span></header>' + targeting
+      + '<div class="battle-zone player-row enemy">' + lifeCards(c,'cpu') + '<div class="battle-core">' + playerStrip(c,'cpu') + '<div class="battle-field enemy-field">' + cpuSlots + '</div></div>' + pileHtml(c,'cpu',false) + '</div>'
+      + '<div class="stage-line"><span>VOCALU STAGE</span></div>'
+      + '<div class="battle-zone player-row user">' + lifeCards(u,'user') + '<div class="battle-core"><div class="battle-field user-field">' + userSlots + '</div>' + playerStrip(u,'user') + '</div>' + pileHtml(u,'user',true) + '</div>'
+      + (u.life<=2?'<div class="clutch-rule">LIFE 2 OR LESS · 召喚した楽曲はすぐ攻撃可能</div>':'') + '<div class="hand-zone"><div class="hand-label"><b>HAND</b><span>' + u.hand.length + ' CARDS</span></div><div class="hand">' + hand + '</div></div>' + impactHtml + '</section>';
     app.innerHTML=shell(board+actionPanel(),true);
   }
   function choose(title,buttons,canCancel) { var cancel=canCancel===false?'':'<button class="secondary" data-action="close-modal">キャンセル</button>';var modal=document.createElement('div');modal.className='modal';modal.innerHTML='<div class="dialog"><h2>' + esc(title) + '</h2><div class="actions">' + buttons + cancel + '</div></div>';document.body.appendChild(modal); }
