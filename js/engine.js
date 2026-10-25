@@ -76,10 +76,28 @@
       var lifeCards = deck.splice(0, 5);
       return { life: 5, lifeCards: lifeCards, deck: deck, hand: hand, field: [], discard: [], maxCost: 0, cost: 0, producerUsed: false };
     }
-    var state = { turn: 0, active: 'user', phase: 'main', winner: null, actionCount: 0, log: [] };
+    var state = { turn: 0, active: 'user', phase: 'main', winner: null, actionCount: 0, log: [], mulliganUsed: false, lastImpact: null };
     state.user = player(deckCards);
     state.cpu = player(cpuCards);
     startTurn(state, 'user', false);
+    return state;
+  }
+
+  function mulligan(state, indexes, rng) {
+    rng = rng || Math.random;
+    if (state.mulliganUsed) throw new Error('マリガンは1ゲームに1回までです');
+    if (state.turn !== 1 || state.active !== 'user' || state.actionCount !== 0) throw new Error('マリガンできるタイミングではありません');
+    var unique = indexes.filter(function (index, position) { return indexes.indexOf(index) === position; }).sort(function (a, b) { return b - a; });
+    if (unique.some(function (index) { return index < 0 || index >= state.user.hand.length; })) throw new Error('戻すカードを確認できません');
+    var returned = unique.map(function (index) { return state.user.hand.splice(index, 1)[0]; });
+    state.user.deck = state.user.deck.concat(returned).sort(function () { return rng() - 0.5; });
+    while (returned.length && state.user.deck.length) {
+      state.user.hand.push(state.user.deck.shift());
+      returned.pop();
+    }
+    state.mulliganUsed = true;
+    state.log.unshift('マリガン · ' + unique.length + '枚を引き直し');
+    validate(state);
     return state;
   }
 
@@ -109,11 +127,11 @@
       p.hand.splice(handIndex, 1);
       var song = clone(card);
       song.currentPower = song.power;
-      song.attacked = p.life !== 1;
+      song.attacked = p.life > 2;
       song.singer = null;
       if (p.field.length >= 3) p.discard.push(p.field.splice(replaceIndex, 1)[0]);
       p.field.push(song);
-      state.log.unshift(card.name + ' を召喚' + (p.life === 1 ? ' · ライフ1で即攻撃可能' : ''));
+      state.log.unshift(card.name + ' を召喚' + (p.life <= 2 ? ' · ライフ2以下で即攻撃可能' : ''));
     } else if (card.type === 'producer') {
       if (p.producerUsed) throw new Error('ボカロPは1ターンに1枚までです');
       p.cost -= card.cost;
@@ -147,25 +165,41 @@
     var enemy = state[side === 'user' ? 'cpu' : 'user'];
     var attacker = p.field[attackerIndex];
     if (!attacker || attacker.attacked) throw new Error('この楽曲は攻撃できません');
+    if (guardIndex != null && (targetType !== 'song' || guardIndex !== targetIndex)) {
+      if (!enemy.field[guardIndex]) throw new Error('ガードする楽曲が見つかりません');
+      if (enemy.field[guardIndex].attacked) throw new Error('REST状態の楽曲はガードできません');
+    }
     var attackPower = attacker.currentPower;
     attacker.attacked = true;
     state.phase = 'attack';
     if (targetType === 'song') {
       var target = enemy.field[targetIndex];
       if (!target) throw new Error('攻撃対象が見つかりません');
-      var targetPower = effectivePower(target);
-      if (attackPower >= targetPower) enemy.discard.push(enemy.field.splice(targetIndex, 1)[0]);
+      var defenderIndex = targetIndex;
+      if (guardIndex != null && guardIndex !== targetIndex) {
+        defenderIndex = guardIndex;
+      }
+      var defender = enemy.field[defenderIndex];
+      var targetPower = effectivePower(defender);
+      if (attackPower >= targetPower) {
+        enemy.discard.push(enemy.field.splice(defenderIndex, 1)[0]);
+        state.lastImpact = { type: 'knockout', side: side === 'user' ? 'cpu' : 'user' };
+      }
       if (attackPower <= targetPower) p.discard.push(p.field.splice(attackerIndex, 1)[0]);
-      state.log.unshift(attacker.name + ' が楽曲へ攻撃');
+      state.log.unshift(attacker.name + ' が ' + defender.name + ' へ攻撃' + (defenderIndex !== targetIndex ? ' · ACTIVEガード' : ''));
     } else {
       if (guardIndex != null && enemy.field[guardIndex]) {
         var guard = enemy.field[guardIndex];
         var guardPower = effectivePower(guard);
-        if (attackPower >= guardPower) enemy.discard.push(enemy.field.splice(guardIndex, 1)[0]);
+        if (attackPower >= guardPower) {
+          enemy.discard.push(enemy.field.splice(guardIndex, 1)[0]);
+          state.lastImpact = { type: 'knockout', side: side === 'user' ? 'cpu' : 'user' };
+        }
         if (attackPower <= guardPower) p.discard.push(p.field.splice(attackerIndex, 1)[0]);
-        state.log.unshift(guard.name + ' でガード' + (guard.attacked ? ' · REST補正 -1000' : ''));
+        state.log.unshift(guard.name + ' でACTIVEガード');
       } else {
         enemy.life -= 1;
+        state.lastImpact = { type: 'life', side: side === 'user' ? 'cpu' : 'user' };
         resolveLifeCard(state, side === 'user' ? 'cpu' : 'user', side);
         state.log.unshift(attacker.name + ' がライフへ攻撃');
         if (enemy.life <= 0) state.winner = side;
@@ -282,5 +316,5 @@
     return true;
   }
 
-  return { RARITY_WEIGHTS: RARITY_WEIGHTS, openPack: openPack, openFivePacks: openFivePacks, autoBuild: autoBuild, makeBattle: makeBattle, playCard: playCard, attack: attack, endTurn: endTurn, cpuMainPhase: cpuMainPhase, cpuTurn: cpuTurn, effectivePower: effectivePower, validate: validate };
+  return { RARITY_WEIGHTS: RARITY_WEIGHTS, openPack: openPack, openFivePacks: openFivePacks, autoBuild: autoBuild, makeBattle: makeBattle, mulligan: mulligan, playCard: playCard, attack: attack, endTurn: endTurn, cpuMainPhase: cpuMainPhase, cpuTurn: cpuTurn, effectivePower: effectivePower, validate: validate };
 }));

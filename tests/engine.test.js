@@ -39,6 +39,12 @@ assert.equal(battle.user.hand.length,3,'opening hand has three cards');
 assert.equal(battle.user.lifeCards.length,5,'five shuffled cards are placed face down as life');
 assert.equal(battle.user.deck.length,12,'opening hand and life are removed from the 20-card deck');
 assert.equal(battle.user.maxCost,1);
+const mulliganBattle = E.makeBattle(deck, deck, () => 0.2);
+E.mulligan(mulliganBattle,[0,2],() => 0.8);
+assert.equal(mulliganBattle.user.hand.length,3,'mulligan redraws the number returned');
+assert.equal(mulliganBattle.user.deck.length,12,'mulligan keeps deck and hand counts stable');
+assert.equal(mulliganBattle.mulliganUsed,true,'mulligan is marked as used');
+assert.throws(()=>E.mulligan(mulliganBattle,[0],() => 0.2),/1ゲームに1回/,'mulligan cannot be used twice');
 E.playCard(battle,'user',0,0);
 assert.equal(battle.user.field.length,1);
 E.endTurn(battle,'user');
@@ -57,6 +63,7 @@ assert.equal(combat.active,'user');
 E.attack(combat,'user',0,'life',null,null);
 assert.equal(combat.cpu.life,4,'direct attack removes one life');
 assert.equal(combat.cpu.lifeCards.length,4,'direct attack removes one face-down life card');
+assert.equal(combat.lastImpact.type,'life','direct life damage exposes the life-break animation state');
 combat.cpu.life = 1;
 combat.user.field[0].attacked = false;
 E.attack(combat,'user',0,'life',null,null);
@@ -76,10 +83,17 @@ restedGuard.cpu.field.push({...weakDeck[0],currentPower:1500,attacked:false});
 restedGuard.user.field.push({...strongDeck[0],currentPower:2000,attacked:true});
 restedGuard.active = 'cpu';
 assert.equal(E.effectivePower(restedGuard.user.field[0]),1000,'REST subtracts 1000 from displayed and combat power');
-E.attack(restedGuard,'cpu',0,'life',null,0);
-assert.equal(restedGuard.user.life,5,'a REST card can still guard life');
-assert.equal(restedGuard.user.field.length,0,'REST penalty is applied while guarding');
-assert.equal(restedGuard.cpu.field.length,1,'attacker survives a weaker REST guard');
+assert.throws(()=>E.attack(restedGuard,'cpu',0,'life',null,0),/REST状態/,'a REST card cannot guard life');
+assert.equal(restedGuard.cpu.field[0].attacked,false,'an invalid REST guard does not consume the attack');
+
+const intercept = E.makeBattle(strongDeck, weakDeck, () => 0.1);
+intercept.cpu.field.push({...weakDeck[0],currentPower:1500,attacked:false});
+intercept.user.field.push({...strongDeck[0],currentPower:3000,attacked:true},{...strongDeck[1],currentPower:1000,attacked:false});
+intercept.active = 'cpu';
+E.attack(intercept,'cpu',0,'song',0,1);
+assert.equal(intercept.user.field.some(c=>c.currentPower===3000),true,'an ACTIVE card can protect a targeted REST card');
+assert.equal(intercept.user.discard.some(c=>c.currentPower===1000),true,'the ACTIVE guard receives the attack');
+assert.equal(intercept.lastImpact.type,'knockout','destroying a battle card exposes the knockout animation state');
 
 const cpuMain = E.makeBattle(strongDeck, weakDeck, () => 0.1);
 E.endTurn(cpuMain,'user');
@@ -104,11 +118,11 @@ assert.equal(replacement.user.field.length,3,'replacement keeps field at three')
 assert.equal(replacement.user.discard.length,1,'replaced song goes to discard');
 
 const clutch = E.makeBattle(strongDeck, weakDeck, () => 0.1);
-clutch.user.life = 1;
+clutch.user.life = 2;
 clutch.user.cost = 10;
 clutch.user.hand = [{...strongDeck[0],cost:1}];
 E.playCard(clutch,'user',0,0);
-assert.equal(clutch.user.field[0].attacked,false,'songs summoned at one life can attack immediately');
+assert.equal(clutch.user.field[0].attacked,false,'songs summoned at two life or less can attack immediately');
 
 const equipment = E.makeBattle(strongDeck, weakDeck, () => 0.1);
 equipment.user.cost = 10;
