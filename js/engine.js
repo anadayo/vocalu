@@ -5,8 +5,8 @@
 }(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var RARITY_WEIGHTS = { N: 55, R: 28, SR: 12, UR: 4, SEC: 1 };
-  var RARITIES = ['N', 'R', 'SR', 'UR', 'SEC'];
+  var RARITY_WEIGHTS = { N: 55, R: 28, SR: 12, UR: 5 };
+  var RARITIES = ['N', 'R', 'SR', 'UR'];
 
   function clone(value) { return JSON.parse(JSON.stringify(value)); }
   function randomItem(items, rng) { return items[Math.floor(rng() * items.length)]; }
@@ -44,7 +44,8 @@
   function autoBuild(cards) {
     var scored = cards.map(function (card, index) {
       var typeScore = card.type === 'song' ? 8000 : card.type === 'producer' ? 3000 : 2000;
-      return { card: card, index: index, score: typeScore + (card.power || card.boost || 0) - (card.cost || 0) * 40 };
+      var curveScore = card.type === 'song' && card.cost <= 2 ? 5000 : 0;
+      return { card: card, index: index, score: typeScore + curveScore + (card.power || card.boost || 0) / 2 - (card.cost || 0) * 900 };
     });
     scored.sort(function (a, b) { return b.score - a.score; });
     var selected = scored.slice(0, 20);
@@ -56,6 +57,13 @@
         selected.splice(selected.indexOf(nonSongs.shift()), 1, songs.shift());
         songCount += 1;
       }
+    }
+    var cheapSongs = scored.filter(function (x) { return x.card.type === 'song' && x.card.cost <= 2 && selected.indexOf(x) < 0; });
+    var selectedCheap = selected.filter(function (x) { return x.card.type === 'song' && x.card.cost <= 2; }).length;
+    var replaceable = selected.filter(function (x) { return x.card.type === 'song' && x.card.cost > 3; }).sort(function (a, b) { return a.score - b.score; });
+    while (selectedCheap < 5 && cheapSongs.length && replaceable.length) {
+      selected.splice(selected.indexOf(replaceable.shift()), 1, cheapSongs.shift());
+      selectedCheap += 1;
     }
     return selected.map(function (x) { return x.index; });
   }
@@ -121,7 +129,10 @@
       if (!p.field[target]) throw new Error('装備先が見つかりません');
       p.cost -= card.cost;
       p.hand.splice(handIndex, 1);
-      if (p.field[target].singer) p.discard.push(p.field[target].singer);
+      if (p.field[target].singer) {
+        p.field[target].currentPower -= p.field[target].singer.boost || 0;
+        p.discard.push(p.field[target].singer);
+      }
       p.field[target].singer = card;
       p.field[target].currentPower += card.boost;
       state.log.unshift(card.name + ' を装備');

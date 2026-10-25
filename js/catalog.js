@@ -14,8 +14,40 @@
     '炉心融解|iroha(sasaki)','右肩の蝶|のりぴー','悪ノ娘|mothy','悪ノ召使|mothy','深海少女|ゆうゆ','1925|T-POCKET','ルカルカ★ナイトフィーバー|samfree','ダブルラリアット|アゴアニキ','Just Be Friends|Dixie Flatline','magnet|minato'
   ];
 
-  var producerNames = ['ryo','DECO*27','wowaka','ハチ','みきとP','ピノキオピー','40mP','kemu','Kanaria','バルーン','Orangestar','カンザキイオリ','Neru','ナユタン星人','じん','れるりり','黒うさP','kz','cosMo@暴走P','sasakure.UK','和田たけあき','日向電工','164','koyori','蝶々P','iroha(sasaki)','mothy','ゆうゆ','samfree','minato'];
-  var singerNames = ['初音ミク','鏡音リン','鏡音レン','巡音ルカ','MEIKO','KAITO','GUMI','IA','flower','音街ウナ','可不','重音テト','歌愛ユキ','結月ゆかり','神威がくぽ','氷山キヨテル','猫村いろは','miki','VY1','VY2','Fukase','MAYU','蒼姫ラピス','kokone','東北ずん子','琴葉茜','琴葉葵','紲星あかり','星界','裏命','狐子','羽累','知声','ナクモ','めろう','ずんだもん','四国めたん','九州そら','双葉湊音','夏色花梨','小春六花','花隈千冬','ゲキヤク','カゼヒキ','足立レイ','波音リツ','桃音モモ','唄音ウタ','亞北ネル','弱音ハク'];
+  // 実在作品のみを収録する。画像は掲載元を確認できた作品だけ別途紐付ける。
+  rawSongs = rawSongs.concat([
+    'アンハッピーリフレイン|wowaka','グレーゾーンにて。|wowaka','とおせんぼ|wowaka','僕のサイノウ|wowaka','テノヒラ|wowaka',
+    'Mrs.Pumpkinの滑稽な夢|ハチ','Persona Alice|ハチ','演劇テレプシコーラ|ハチ','恋人のランジェ|ハチ','clock lock works|ハチ',
+    'ストリーミングハート|DECO*27','アンドロイドガール|DECO*27','シンデレラ|DECO*27','ラビットホール|DECO*27','サラマンダー|DECO*27',
+    '妄想税|DECO*27','毒占欲|DECO*27','ハートアラモード|DECO*27','リバーシブル・キャンペーン|DECO*27','スクランブル交際|DECO*27',
+    '東京駅|みきとP','小夜子|みきとP','ヨンジュウナナ|みきとP','僕は初音ミクとキスをした|みきとP','刹那プラス|みきとP',
+    'ノンブレス・オブリージュ|ピノキオピー','ラヴィット|ピノキオピー','転生林檎|ピノキオピー','内臓ありますか|ピノキオピー','ぼくらはみんな意味不明|ピノキオピー',
+    '頓珍漢の宴|ピノキオピー','アルティメットセンパイ|ピノキオピー','零号|ピノキオピー','おばけのウケねらい|ピノキオピー','余命2:30|ピノキオピー',
+    'タイムマシン|40mP','少年と魔法のロボット|40mP','春に一番近い街|40mP','妄想スケッチ|40mP','純情スカート|40mP',
+    'シリョクケンサ|40mP','キミボシ|40mP','巨大少女|40mP','ジェンガ|40mP','夢地図|40mP',
+    'カミサマネジマキ|kemu','イカサマライフゲイム|kemu','リンカーネイション|kemu','拝啓ドッペルゲンガー|kemu','インタビュア|クワガタP',
+    'MIRA|Kanaria','アイデンティティ|Kanaria','デーモンロード|Kanaria','レクイエム|Kanaria','百鬼祭|Kanaria',
+    'ノマド|バルーン','パメラ|バルーン','ミザン|バルーン','愛及屋烏|バルーン','夕染|バルーン',
+    'Henceforth|Orangestar','Surges|Orangestar','霽れを待つ|Orangestar','空奏列車|Orangestar','Alice in 冷凍庫|Orangestar',
+    '雨き声残響|Orangestar','シンクロナイザー|Orangestar','未完成タイムリミッター|Orangestar','残灯花火|Orangestar','夏色アンサー|Orangestar',
+    'テロル|Neru','イドラのサーカス|Neru','延命治療|Neru','命のユースティティア|Neru','ばいばい、ノスタルジーカ|Neru',
+    'SNOBBISM|Neru','捨て子のステラ|Neru','病名は愛だった|Neru','脱獄|Neru','potatoになっていく|Neru',
+    'ロケットサイダー|ナユタン星人','ストラトステラ|ナユタン星人','明星ギャラクティカ|ナユタン星人','アンドロメダアンドロメダ|ナユタン星人','金星のダンス|ナユタン星人',
+    '群青レイン|じん','オツキミリサイタル|じん','サマータイムレコード|じん','ヘッドフォンアクター|じん','メカクシコード|じん',
+    '想像フォレスト|じん','夕景イエスタデイ|じん','コノハの世界事情|じん','ロスタイムメモリー|じん','アヤノの幸福理論|じん',
+    '厨病激発ボーイ|れるりり','一触即発☆禅ガール|れるりり','神のまにまに|れるりり','Mr.Music|れるりり','乱躁滅裂ガール|れるりり',
+    'エンヴィキャットウォーク|トーマ','バビロン|トーマ','オレンジ|トーマ','九龍レトロ|トーマ','ヤンキーボーイ・ヤンキーガール|トーマ',
+    '骸骨楽団とリリア|トーマ','魔法少女幸福論|トーマ','アザレアの亡霊|トーマ','幽霊屋敷の首吊り少女|トーマ','クジラ病棟の或る前夜|トーマ',
+    'いかないで|想太','ウミユリ海底譚|n-buna','夜明けと蛍|n-buna','メリュー|n-buna','透明エレジー|n-buna',
+    '始発とカフカ|n-buna','白ゆき|n-buna','花降らし|n-buna','ラプンツェル|n-buna','アイラ|n-buna',
+    'ベノム|かいりきベア','ダーリンダンス|かいりきベア','失敗作少女|かいりきベア','アルカリレットウセイ|かいりきベア','アンヘル|かいりきベア',
+    'バグ|かいりきベア','ルマ|かいりきベア','メンタルチェンソー|かいりきベア','マネマネサイコトロピック|かいりきベア','アイ情劣等生|かいりきベア',
+    'フォニイ|ツミキ','トウキョウダイバアフェイクショウ|ツミキ','リコレクションエンドロウル|ツミキ','レゾンデイトル・カレイドスコウプ|ツミキ','ニビイロドロウレ|ツミキ',
+    'マーシャル・マキシマイザー|柊マグネタイト','終焉逃避行|柊マグネタイト','旧約汎化街|柊マグネタイト','或世界消失|柊マグネタイト','リアライズ|柊マグネタイト'
+  ]);
+
+  var producerNames = ['ryo','DECO*27','wowaka','ハチ','みきとP','ピノキオピー','40mP','kemu','Kanaria','バルーン','Orangestar','カンザキイオリ','Neru','ナユタン星人','じん','れるりり','黒うさP','kz','cosMo@暴走P','sasakure.UK'];
+  var singerNames = ['初音ミク','鏡音リン','鏡音レン','巡音ルカ','MEIKO','KAITO','GUMI','IA','flower','音街ウナ','可不','重音テト','歌愛ユキ','結月ゆかり','神威がくぽ','氷山キヨテル','猫村いろは','miki','VY1','VY2','Fukase','MAYU','蒼姫ラピス','kokone','東北ずん子','琴葉茜','琴葉葵','紲星あかり','星界','裏命','狐子','羽累','知声','ナクモ','めろう','ずんだもん','四国めたん','九州そら','双葉湊音','夏色花梨'];
 
   function vocaDbProfile(id, extension) {
     return { image: 'https://static.vocadb.net/img/Artist/mainOrig/' + id + '.' + (extension || 'png'), source: 'https://vocadb.net/Artist/Details/' + id, label: 'VocaDB掲載プロフィール画像' };
@@ -80,13 +112,11 @@
     'magnet': { url: 'https://www.nicovideo.jp/watch/sm6909505', thumb: 'https://nicovideo.cdn.nimg.jp/thumbnails/6909505/6909505', source: 'ニコニコ動画・制作者本人投稿' }
   };
 
-  function rarityFor(index) {
-    var roll = (index * 37 + 11) % 100;
-    if (roll < 55) return 'N';
-    if (roll < 83) return 'R';
-    if (roll < 95) return 'SR';
-    if (roll < 99) return 'UR';
-    return 'SEC';
+  function rarityByQuota(index, quotas) {
+    if (index < quotas[0]) return 'N';
+    if (index < quotas[0] + quotas[1]) return 'R';
+    if (index < quotas[0] + quotas[1] + quotas[2]) return 'SR';
+    return 'UR';
   }
   function powerFor(index) { return 1000 + ((index * 7) % 19) * 500; }
   function songCost(power) { return Math.max(1, Math.min(10, Math.ceil(power / 1500))); }
@@ -104,15 +134,12 @@
     var basePower = powerFor(index);
     var videoId = verifiedVideos[parts[0]] || null;
     var artwork = verifiedArtwork[parts[0]] || null;
-    [false, true].forEach(function (special, variant) {
-      var id = 'song-' + String(index + 1).padStart(3, '0') + (special ? '-sp' : '');
-      songs.push({
-        id: id,
+    songs.push({
+        id: 'song-' + String(index + 1).padStart(3, '0'),
         type: 'song',
         name: parts[0],
         producer: parts[1],
-        variant: special ? 'コレクター版' : '通常版',
-        rarity: special ? rarityFor(index + 180) : rarityFor(index),
+        rarity: rarityByQuota(index, [100, 80, 45, 15]),
         power: basePower,
         cost: songCost(basePower),
         viewCount: null,
@@ -124,18 +151,26 @@
         mediaSource: videoId ? 'YouTube公式投稿' : artwork ? artwork.source : null,
         metricNote: videoId || artwork ? '作品と投稿元を確認済み。再生数と対戦値の同期は準備中です。' : '公式画像は確認待ち。対戦値はテスト用バランス値です。'
       });
-    });
   });
 
   var producers = producerNames.map(function (name, index) {
     var profile = producerProfiles[name];
-    return { id: 'producer-' + String(index + 1).padStart(2, '0'), type: 'producer', name: name, rarity: rarityFor(index + 40), cost: 1 + index % 3, bonus: 500 + index % 4 * 500, text: '自分の楽曲を強化。制作楽曲が場にあると効果が2倍。', trigger: triggerFor(index, 0), thumbnailUrl: profile.image, thumbnailVerified: true, profileUrl: profile.source, mediaSource: profile.label, mediaVerifiedAt: '2026-10-17' };
+    return { id: 'producer-' + String(index + 1).padStart(2, '0'), type: 'producer', name: name, rarity: rarityByQuota(index, [4, 6, 6, 4]), cost: 1 + index % 3, bonus: 500 + index % 4 * 500, text: '自分の楽曲を強化。制作楽曲が場にあると効果が2倍。', trigger: triggerFor(index, 0), thumbnailUrl: profile.image, thumbnailVerified: true, profileUrl: profile.source, mediaSource: profile.label, mediaVerifiedAt: '2026-10-17' };
   });
   var singers = singerNames.map(function (name, index) {
     var profile = singerProfiles[name];
-    return { id: 'singer-' + String(index + 1).padStart(2, '0'), type: 'singer', name: name, rarity: rarityFor(index + 70), cost: 1 + index % 3, boost: 500 + index % 5 * 500, profile: '楽曲に装備し、歌声の個性でパワーを加えるサポートカード。', trigger: triggerFor(index, 2), thumbnailUrl: profile.image, thumbnailVerified: true, profileUrl: profile.source, mediaSource: profile.label, mediaVerifiedAt: '2026-10-17' };
+    return { id: 'singer-' + String(index + 1).padStart(2, '0'), type: 'singer', name: name, rarity: rarityByQuota(index, [16, 12, 8, 4]), cost: 1 + index % 3, boost: 500 + index % 5 * 500, profile: '楽曲に装備し、歌声の個性でパワーを加えるサポートカード。', trigger: triggerFor(index, 2), thumbnailUrl: profile.image, thumbnailVerified: true, profileUrl: profile.source, mediaSource: profile.label, mediaVerifiedAt: '2026-10-17' };
   });
 
   var catalog = songs.concat(producers, singers);
-  root.VocaluCatalog = { cards: catalog, songs: songs, producers: producers, singers: singers, counts: { songs: songs.length, producers: producers.length, singers: singers.length, total: catalog.length } };
+  var legacyIdMap = songs.reduce(function (map, song, index) { map['song-' + String(index + 1).padStart(3, '0') + '-sp'] = song.id; return map; }, {});
+  function migrateCollection(raw) {
+    var migrated = {};
+    Object.keys(raw || {}).forEach(function (oldId) {
+      var newId = legacyIdMap[oldId] || oldId;
+      if (catalog.some(function (card) { return card.id === newId; })) migrated[newId] = (migrated[newId] || 0) + Math.max(0, Number(raw[oldId]) || 0);
+    });
+    return migrated;
+  }
+  root.VocaluCatalog = { cards: catalog, songs: songs, producers: producers, singers: singers, legacyIdMap: legacyIdMap, migrateCollection: migrateCollection, counts: { songs: songs.length, producers: producers.length, singers: singers.length, total: catalog.length } };
 }(typeof self !== 'undefined' ? self : this));

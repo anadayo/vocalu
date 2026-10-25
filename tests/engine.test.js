@@ -5,18 +5,23 @@ require('../js/catalog.js');
 const E = require('../js/engine.js');
 
 function rngSequence(values) { let i=0; return () => values[(i++)%values.length]; }
-assert.equal(global.VocaluCatalog.cards.length, 280, 'catalog total');
-assert.equal(global.VocaluCatalog.songs.length, 200, 'songs total');
-assert.equal(global.VocaluCatalog.producers.length, 30, 'producer total');
-assert.equal(global.VocaluCatalog.singers.length, 50, 'singer total');
-assert.equal(global.VocaluCatalog.songs.filter(c => c.thumbnailVerified).length, 200, 'all songs have verified artwork for both card variants');
-assert.equal(global.VocaluCatalog.producers.filter(c => c.thumbnailVerified && c.thumbnailUrl && c.profileUrl).length, 30, 'all producers have sourced profile artwork');
-assert.equal(global.VocaluCatalog.singers.filter(c => c.thumbnailVerified && c.thumbnailUrl && c.profileUrl).length, 50, 'all singers have sourced profile artwork');
-assert.equal(global.VocaluCatalog.producers.filter(c => c.trigger && c.trigger.type).length, 30, 'all producers have triggers');
-assert.equal(global.VocaluCatalog.singers.filter(c => c.trigger && c.trigger.type).length, 50, 'all singers have triggers');
+assert.equal(global.VocaluCatalog.cards.length, 300, 'catalog total');
+assert.equal(global.VocaluCatalog.songs.length, 240, 'songs total');
+assert.equal(global.VocaluCatalog.producers.length, 20, 'producer total');
+assert.equal(global.VocaluCatalog.singers.length, 40, 'singer total');
+assert.equal(new Set(global.VocaluCatalog.songs.map(c => c.name)).size, 240, 'songs are unique');
+assert.equal(global.VocaluCatalog.cards.some(c => c.variant === 'コレクター版' || /-sp$/.test(c.id)), false, 'collector cards are removed');
+assert.equal(global.VocaluCatalog.producers.filter(c => c.thumbnailVerified && c.thumbnailUrl && c.profileUrl).length, 20, 'all producers have sourced profile artwork');
+assert.equal(global.VocaluCatalog.singers.filter(c => c.thumbnailVerified && c.thumbnailUrl && c.profileUrl).length, 40, 'all singers have sourced profile artwork');
+assert.equal(global.VocaluCatalog.producers.filter(c => c.trigger && c.trigger.type).length, 20, 'all producers have triggers');
+assert.equal(global.VocaluCatalog.singers.filter(c => c.trigger && c.trigger.type).length, 40, 'all singers have triggers');
+assert.deepEqual(global.VocaluCatalog.songs.reduce((a,c)=>(a[c.rarity]=(a[c.rarity]||0)+1,a),{}), {N:100,R:80,SR:45,UR:15});
+assert.deepEqual(global.VocaluCatalog.producers.reduce((a,c)=>(a[c.rarity]=(a[c.rarity]||0)+1,a),{}), {N:4,R:6,SR:6,UR:4});
+assert.deepEqual(global.VocaluCatalog.singers.reduce((a,c)=>(a[c.rarity]=(a[c.rarity]||0)+1,a),{}), {N:16,R:12,SR:8,UR:4});
+assert.deepEqual(global.VocaluCatalog.migrateCollection({'song-001':2,'song-001-sp':1,'missing-card':9}), {'song-001':3}, 'collector ownership migrates once into the base card');
 assert.ok(global.VocaluCatalog.songs.find(c => c.name === 'ローリンガール').videoUrl.includes('vnw8zURAxkU'));
 assert.ok(global.VocaluCatalog.producers.find(c => c.name === 'じん').thumbnailUrl.includes('/552.jpg'), 'Jin uses the verified producer profile');
-assert.ok(global.VocaluCatalog.producers.find(c => c.name === 'minato').thumbnailUrl.includes('/17.jpg'), 'minato uses the verified producer profile');
+assert.ok(global.VocaluCatalog.producers.find(c => c.name === 'sasakure.UK').thumbnailUrl.includes('/51.jpg'), 'sasakure.UK uses the verified producer profile');
 assert.ok(global.VocaluCatalog.singers.find(c => c.name === '鏡音レン').thumbnailUrl.includes('/15.png'), 'Kagamine Len uses the character profile');
 assert.ok(global.VocaluCatalog.singers.find(c => c.name === 'flower').thumbnailUrl.includes('/21165.png'), 'flower uses the character profile');
 assert.ok(global.VocaluCatalog.singers.find(c => c.name === 'miki').thumbnailUrl.includes('/146.png'), 'miki uses the character profile');
@@ -94,6 +99,17 @@ clutch.user.cost = 10;
 clutch.user.hand = [{...strongDeck[0],cost:1}];
 E.playCard(clutch,'user',0,0);
 assert.equal(clutch.user.field[0].attacked,false,'songs summoned at one life can attack immediately');
+
+const equipment = E.makeBattle(strongDeck, weakDeck, () => 0.1);
+equipment.user.cost = 10;
+equipment.user.maxCost = 10;
+equipment.user.field = [{...strongDeck[0],currentPower:9000,attacked:false,singer:null}];
+equipment.user.hand = [{...global.VocaluCatalog.singers[0],boost:500,cost:1},{...global.VocaluCatalog.singers[1],boost:1500,cost:1}];
+E.playCard(equipment,'user',0,0);
+assert.equal(equipment.user.field[0].currentPower,9500,'first singer boost is applied');
+E.playCard(equipment,'user',0,0);
+assert.equal(equipment.user.field[0].currentPower,10500,'replacing equipment removes the previous boost');
+assert.equal(equipment.user.discard.length,1,'replaced singer is discarded');
 
 function makeTriggerBattle(type) {
   const support = global.VocaluCatalog.cards.find(c => c.type !== 'song' && c.trigger.type === type);
