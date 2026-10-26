@@ -6,15 +6,34 @@
   var testMode = new URLSearchParams(location.search).get('test') === '1';
   var STORAGE = 'vocalu-save-v1';
   var MIGRATION = 'vocalu-migration-v3';
+  var RANK_STORAGE = 'vocalu-rank-v1';
   var state = {
     screen: 'home', opened: [], packNo: 0, selected: [], battle: null,
     selectedUnit: null, targeting: null, panelTab: 'log', triggerResume: null, mulliganSelected: [],
-    difficulty: 'normal',
+    difficulty: 'normal', matchMode: 'free', rank: loadRank(),
     collection: loadAndMigrate(), light: matchMedia('(prefers-reduced-motion: reduce)').matches,
     music: { ready: false, playing: false, volume: 40, title: 'BGM未再生' }
   };
   var yt = null;
   var renderedScreen = null;
+
+  function loadRank() {
+    var saved = {};
+    try { saved = JSON.parse(localStorage.getItem(RANK_STORAGE) || '{}'); } catch (ignore) {}
+    return {
+      rating: Math.max(0, Number(saved.rating) || 1000),
+      wins: Math.max(0, Number(saved.wins) || 0),
+      losses: Math.max(0, Number(saved.losses) || 0)
+    };
+  }
+  function saveRank() { try { localStorage.setItem(RANK_STORAGE, JSON.stringify(state.rank)); } catch (ignore) {} }
+  function rankName(rating) { return rating >= 1700 ? 'MASTER' : rating >= 1500 ? 'PLATINUM' : rating >= 1300 ? 'GOLD' : rating >= 1100 ? 'SILVER' : 'BRONZE'; }
+  function beginMatch(mode) {
+    state.matchMode=mode;
+    state.difficulty=mode==='ranked'?'expert':'normal';
+    state.opened=[];state.packNo=0;state.selected=[];state.battle=null;
+    state.screen='pack';render();
+  }
 
   function loadAndMigrate() {
     var raw = {};
@@ -85,7 +104,7 @@
   }
   function renderHome() {
     var owned = Object.keys(state.collection).filter(function (id) { return state.collection[id] > 0; }).length;
-    app.innerHTML = shell('<section class="hero"><span class="eyebrow">DIGITAL TCG</span><h1>開けて、組んで、歌わせる。</h1><p>5パックから生まれる20枚デッキで、すぐにCPUバトル。</p></section><div class="status-grid"><div class="stat"><b>300</b><small>カード</small></div><div class="stat"><b>' + owned + '</b><small>図鑑</small></div><div class="stat"><b>5</b><small>ライフ</small></div></div><div class="actions"><button class="primary" data-action="start">5パック開封を始める</button><button class="secondary" data-action="collection">コレクション</button><button class="secondary" data-action="toggle-light">軽量モード ' + (state.light ? 'ON' : 'OFF') + '</button></div><p class="notice">全300枚の画像と掲載元を確認済みです。楽曲情報はVocaDBと公式投稿を照合しています。</p>' + testPanel());
+    app.innerHTML = shell('<section class="lobby"><div class="lobby-mast"><div class="lobby-title"><span>VOCALU BATTLE LOBBY</span><h1>ボカる！</h1><p>開けて、組んで、歌わせる。</p></div><img class="lobby-pack" src="assets/bc01-pack.webp" alt="VOCALU BC01"></div><div class="mode-select"><button class="mode-tile ranked" data-action="ranked-match"><span class="mode-index">01</span><span class="mode-copy"><small>CPU LADDER</small><strong>ランクマッチ</strong><em>勝敗でレートが変動</em></span><span class="mode-status"><b>' + rankName(state.rank.rating) + '</b><small>RATE ' + state.rank.rating + '</small></span></button><button class="mode-tile free" data-action="free-match"><span class="mode-index">02</span><span class="mode-copy"><small>CASUAL BATTLE</small><strong>フリーマッチ</strong><em>CPU難易度を選んで対戦</em></span><span class="mode-arrow" aria-hidden="true">›</span></button><button class="mode-tile collection" data-action="collection"><span class="mode-index">03</span><span class="mode-copy"><small>CARD LIBRARY</small><strong>コレクション</strong><em>楽曲の再生とカード確認</em></span><span class="mode-status"><b>' + owned + '</b><small>/ 300</small></span></button></div><div class="lobby-record"><span>RANK RECORD</span><b>' + state.rank.wins + ' WIN</b><b>' + state.rank.losses + ' LOSS</b><button data-action="toggle-light">軽量モード ' + (state.light ? 'ON' : 'OFF') + '</button></div></section>' + testPanel());
   }
   function testPanel() {
     if (!testMode) return '';
@@ -107,10 +126,10 @@
   function renderSetup() {
     var deck=state.selected.map(function(i){return state.opened[i];}); var lead=deck.find(function(c){return c.type==='song';})||deck[0]; var cpu=makeCpuDeck();
     var levels=[['normal','ノーマル','気軽に対戦'],['hard','ハード','強いカードを優先'],['expert','エキスパート','有利な交換を狙う']];
-    var difficulty='<section class="difficulty-select"><span>CPU DIFFICULTY</span><div>' + levels.map(function(level){return '<button class="' + (state.difficulty===level[0]?'active':'') + '" data-action="difficulty" data-level="' + level[0] + '"><b>' + level[1] + '</b><small>' + level[2] + '</small></button>';}).join('') + '</div></section>';
+    var difficulty=state.matchMode==='ranked'?'<section class="ranked-brief"><span>RANK MATCH</span><b>' + rankName(state.rank.rating) + ' · RATE ' + state.rank.rating + '</b><p>エキスパートCPU戦。勝利 +25 / 敗北 -20</p></section>':'<section class="difficulty-select"><span>CPU DIFFICULTY</span><div>' + levels.map(function(level){return '<button class="' + (state.difficulty===level[0]?'active':'') + '" data-action="difficulty" data-level="' + level[0] + '"><b>' + level[1] + '</b><small>' + level[2] + '</small></button>';}).join('') + '</div></section>';
     app.innerHTML=shell('<section class="battle-setup"><div class="setup-deck"><span>YOUR DECK</span>' + cardFace(lead,false) + '<b>VOCALU DECK</b><small>' + deck.length + ' CARDS</small><button class="secondary" data-action="back-deck">デッキ変更</button></div><strong class="versus">VS</strong><div class="setup-deck opponent"><span>CPU DECK</span>' + cardFace(cpu[0],false) + '<b>STUDIO CPU</b><small>' + difficultyName() + '</small></div></section>' + difficulty + '<button class="primary setup-start" data-action="battle-start">BATTLE START</button>');
   }
-  function difficultyName(){return state.difficulty==='expert'?'EXPERT':state.difficulty==='hard'?'HARD':'NORMAL';}
+  function difficultyName(){if(state.matchMode==='ranked')return 'RANKED · EXPERT';return state.difficulty==='expert'?'EXPERT':state.difficulty==='hard'?'HARD':'NORMAL';}
   function startBattle() { var deck=state.selected.map(function(i){return state.opened[i];});state.battle=VocaluEngine.makeBattle(deck,makeCpuDeck());state.selectedUnit=null;state.targeting=null;state.mulliganSelected=[];state.screen='opening';render(); }
   function startTestBattle() {
     var deck=VocaluCatalog.songs.slice(0,14).concat(VocaluCatalog.producers.slice(0,3),VocaluCatalog.singers.slice(0,3));
@@ -185,8 +204,18 @@
   function resolveUserAttack(targetType,targetIndex) { var attacker=state.targeting,enemy=state.battle.cpu,guard=null;state.targeting=null;if(targetType==='song'&&enemy.field[targetIndex]&&enemy.field[targetIndex].attacked)guard=enemy.field.findIndex(function(song,index){return index!==targetIndex&&!song.attacked;});else if(targetType==='life'&&enemy.life<=2){guard=enemy.field.findIndex(function(song){return !song.attacked;});if(guard<0)guard=enemy.field.findIndex(function(){return true;});}if(guard<0)guard=null;VocaluEngine.attack(state.battle,'user',attacker,targetType,targetIndex,guard);if(guard!=null)toast(targetType==='life'?'CPUの楽曲がライフをガード':'CPUのACTIVE楽曲がガード');state.selectedUnit=null;afterAction(); }
   function showTriggerNotice(resume) { var trigger=state.battle&&state.battle.lastTrigger;if(!trigger)return false;state.battle.lastTrigger=null;state.triggerResume=resume||null;render();choose('TRIGGER 発動','<div class="trigger-reveal"><span>' + esc((trigger.side==='user'?'あなた':'CPU')+'のライフ') + '</span><b>' + esc(trigger.cardName) + '</b><strong>' + esc(trigger.label) + '</strong><p>' + esc(trigger.text) + '</p></div><button class="primary" data-action="dismiss-trigger">効果を確認</button>',false);return true; }
   function afterAction(){state.panelTab='log';if(state.battle.winner)finishBattle();else if(!showTriggerNotice(null))render();}
-  function finishBattle(){saveCollection(state.opened);state.screen='result';render();}
-  function renderResult(){var win=state.battle.winner==='user';app.innerHTML=shell('<section class="hero result"><span class="eyebrow">BATTLE RESULT</span><h1>' + (win?'LIVE CLEAR!':'NEXT STAGE') + '</h1><p>' + (win?'勝利しました。':'今回はCPUの勝利です。') + ' 開封した25枚をコレクションに保存しました。</p></section><div class="actions"><button class="primary" data-action="restart">もう一度遊ぶ</button><button class="secondary" data-action="collection">コレクションを見る</button></div>');}
+  function finishBattle(){
+    saveCollection(state.opened);
+    if(state.matchMode==='ranked'&&!state.battle.rankSettled){
+      var won=state.battle.winner==='user';
+      state.battle.rankDelta=won?25:-20;
+      state.rank.rating=Math.max(0,state.rank.rating+state.battle.rankDelta);
+      if(won)state.rank.wins+=1;else state.rank.losses+=1;
+      state.battle.rankSettled=true;saveRank();
+    }
+    state.screen='result';render();
+  }
+  function renderResult(){var win=state.battle.winner==='user';var ranked=state.matchMode==='ranked';var rankResult=ranked?'<div class="rank-result"><span>' + (state.battle.rankDelta>0?'+':'') + state.battle.rankDelta + ' RATE</span><b>' + rankName(state.rank.rating) + ' · ' + state.rank.rating + '</b></div>':'';app.innerHTML=shell('<section class="hero result"><span class="eyebrow">BATTLE RESULT</span><h1>' + (win?'LIVE CLEAR!':'NEXT STAGE') + '</h1><p>' + (win?'勝利しました。':'今回はCPUの勝利です。') + ' 開封した25枚をコレクションに保存しました。</p></section>' + rankResult + '<div class="actions"><button class="primary" data-action="rematch">もう一度遊ぶ</button><button class="secondary" data-action="home">ロビーへ戻る</button><button class="secondary" data-action="collection">コレクションを見る</button></div>');}
   function renderCollection(){var cards=VocaluCatalog.cards.filter(function(c){return state.collection[c.id];});app.innerHTML=shell('<div class="section-head"><h2>コレクション</h2><span>' + cards.length + ' / 300種</span></div>' + (cards.length?'<div class="cards">' + cards.map(function(c){return cardHtml(c,-1,false);}).join('') + '</div>':'<p class="notice">対戦を最後まで終えると、開封カードがここに保存されます。</p>') + '<div class="deck-footer"><button class="primary" data-action="home">ホームへ</button></div>');}
   function mediaEmbed(card){if(card.type!=='song'||!card.videoUrl)return '';var url=card.videoUrl,embed='';var youtube=url.match(/[?&]v=([\w-]{6,})/)||url.match(/youtu\.be\/([\w-]{6,})/);var nico=url.match(/nicovideo\.jp\/watch\/(sm\d+)/);if(youtube)embed='https://www.youtube-nocookie.com/embed/'+youtube[1]+'?playsinline=1';else if(nico)embed='https://embed.nicovideo.jp/watch/'+nico[1];if(!embed)return '';return '<div class="song-player"><span>公式楽曲を再生</span><iframe src="' + esc(embed) + '" title="' + esc(card.name) + ' 公式動画" loading="lazy" allow="accelerometer; autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe></div>';}
   function detailContent(card){var text=card.type==='song'?card.metricNote:(card.text||card.profile);var trigger=card.trigger?'<div class="trigger-detail"><b>TRIGGER · ' + esc(card.trigger.label) + '</b><p>' + esc(card.trigger.text) + '</p></div>':'';var abilities=(card.abilities||[]).map(function(ability){return '<div class="ability-detail"><b>' + esc(ability.label) + '</b><p>' + esc(ability.text) + '</p></div>';}).join('');var equip=card.singer?'<div class="equipment-detail"><h3>装備中の歌い手</h3>' + cardFace(card.singer,false) + '<p>POWER +' + card.singer.boost + '</p></div>':'';var source=card.videoUrl||card.profileUrl;return '<div class="detail-card">' + cardFace(card,false) + '</div><p>' + esc(text) + '</p>' + abilities + trigger + equip + mediaEmbed(card) + (source?'<a class="official-link" href="' + esc(source) + '" target="_blank" rel="noopener">掲載元を見る</a>':'');}
@@ -205,7 +234,8 @@
   function runNextCpuAttack(){var b=state.battle;if(b.winner)return finishBattle();var ai=b.cpu.field.findIndex(function(song){return !song.attacked;});if(ai<0){VocaluEngine.endTurn(b,'cpu');return render();}var attacker=b.cpu.field[ai];var target=cpuTarget(attacker,b.user.field);if(target>=0&&b.user.life>1){var guards=b.user.field.map(function(song,i){return {song:song,index:i};}).filter(function(x){return x.index!==target&&!x.song.attacked;});if(b.user.field[target].attacked&&guards.length){var guardOptions='<button class="primary" data-action="resolve-cpu-attack" data-attacker="' + ai + '" data-target="song" data-target-index="' + target + '" data-guard="none">その楽曲で受ける</button>'+guards.map(function(x){return '<button class="secondary" data-action="resolve-cpu-attack" data-attacker="' + ai + '" data-target="song" data-target-index="' + target + '" data-guard="' + x.index + '">' + esc(x.song.name) + 'でACTIVEガード · POW ' + VocaluEngine.effectivePower(x.song) + '</button>';}).join('');return choose(attacker.name+'がREST楽曲へ攻撃',guardOptions,false);}VocaluEngine.attack(b,'cpu',ai,'song',target,null);render();return setTimeout(runNextCpuAttack,state.light?20:280);}var lifeGuards=b.user.field.map(function(song,i){return {song:song,index:i};});var options='<button class="primary" data-action="resolve-cpu-attack" data-attacker="' + ai + '" data-target="life" data-guard="none">ライフで受ける</button>'+lifeGuards.map(function(x){return '<button class="secondary" data-action="resolve-cpu-attack" data-attacker="' + ai + '" data-target="life" data-guard="' + x.index + '">' + esc(x.song.name) + 'でガード · ' + (x.song.attacked?'REST -1000 · ':'ACTIVE · ') + 'POW ' + VocaluEngine.effectivePower(x.song) + '</button>';}).join('');choose(attacker.name+'の攻撃 · POW '+attacker.currentPower,options,false);}
 
   document.addEventListener('click',function(event){var button=event.target.closest('[data-action]');if(!button)return;var action=button.dataset.action;try{
-    if(action==='start'){state.opened=[];state.packNo=0;state.selected=[];state.screen='pack';render();}
+    if(action==='start'||action==='free-match')beginMatch('free');
+    else if(action==='ranked-match')beginMatch('ranked');
     else if(action==='open-pack'){button.classList.add('opening');setTimeout(function(){revealPack(VocaluEngine.openPack(VocaluCatalog.cards));},state.light?20:500);}
     else if(action==='bulk-open'){while(state.packNo<5){state.opened=state.opened.concat(VocaluEngine.openPack(VocaluCatalog.cards));state.packNo+=1;}state.screen='deck';state.selected=VocaluEngine.autoBuild(state.opened);render();}
     else if(action==='next-pack'){state.screen=state.packNo<5?'pack':'deck';if(state.screen==='deck')state.selected=VocaluEngine.autoBuild(state.opened);render();}
@@ -241,7 +271,7 @@
     else if(action==='close-modal')button.closest('.modal').remove();
     else if(action==='collection'){state.screen='collection';render();}
     else if(action==='home'){state.screen='home';render();}
-    else if(action==='restart'){state.opened=[];state.packNo=0;state.selected=[];state.battle=null;state.screen='pack';render();}
+    else if(action==='restart'||action==='rematch')beginMatch(state.matchMode);
     else if(action==='toggle-light'){state.light=!state.light;render();}
     else if(action==='music')musicControls();
     else if(action==='music-prev'){if(yt&&state.music.ready)yt.previousVideo();}
@@ -250,7 +280,7 @@
     else if(action==='music-down'||action==='music-up'){state.music.volume=Math.max(0,Math.min(100,state.music.volume+(action==='music-up'?10:-10)));if(yt&&state.music.ready)yt.setVolume(state.music.volume);button.closest('.modal').remove();musicControls();}
     else if(action==='detail')cardDetail(button.dataset.card);
     else if(action==='force-rare'){var forced=VocaluCatalog.cards.find(function(c){return c.rarity===button.dataset.rare;});flash(button.dataset.rare);choose(button.dataset.rare+'演出確認',cardHtml(forced,-1,false));}
-    else if(action==='reset-save'){localStorage.removeItem(STORAGE);localStorage.removeItem(MIGRATION);state.collection={};render();}
+    else if(action==='reset-save'){localStorage.removeItem(STORAGE);localStorage.removeItem(MIGRATION);localStorage.removeItem(RANK_STORAGE);state.collection={};state.rank={rating:1000,wins:0,losses:0};render();}
   }catch(err){toast(err.message||'操作を続けられませんでした');console.error(err);}});
   document.addEventListener('input',function(event){if(!event.target.matches('[data-volume]'))return;state.music.volume=Number(event.target.value);var label=event.target.closest('.dialog').querySelector('[data-volume-label]');if(label)label.textContent=state.music.volume;if(yt&&state.music.ready)yt.setVolume(state.music.volume);});
   var startY=0;app.addEventListener('touchstart',function(e){var p=e.target.closest('[data-action="open-pack"]');if(p&&e.touches[0])startY=e.touches[0].clientY;},{passive:true});app.addEventListener('touchend',function(e){var p=e.target.closest('[data-action="open-pack"]');if(p&&e.changedTouches[0]&&startY-e.changedTouches[0].clientY>35)p.click();},{passive:true});
