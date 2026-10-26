@@ -121,17 +121,54 @@
   function powerFor(index) { return 1000 + ((index * 7) % 19) * 500; }
   function songCost(power) { return Math.max(1, Math.min(10, Math.ceil(power / 1500))); }
   var triggerEffects = [
-    { type:'destroy_all', label:'ステージリセット', text:'相手の場の楽曲をすべて破壊する。' },
-    { type:'cost_limit', label:'コストオーバー', text:'相手の場を合計コスト10以下になるまで、高コスト順に破壊する。' },
+    { type:'destroy_one', label:'ステージブレイク', text:'相手の場で最もパワーが高い楽曲1枚を倒す。' },
+    { type:'heal_one', label:'リカバリーライブ', text:'デッキの上から1枚をLIFEに置き、LIFEを1回復する。' },
+    { type:'discard_one', label:'ノイズキャンセル', text:'相手は手札を1枚捨てる。' },
     { type:'bounce', label:'リテイク', text:'相手の場で最もパワーが高い楽曲1枚を手札へ戻す。' },
     { type:'stop_attacks', label:'ブレイクタイム', text:'相手の場の楽曲は、このターンこれ以上攻撃できない。' }
   ];
-  function triggerFor(index, offset) { return triggerEffects[(index + offset) % triggerEffects.length]; }
+  function triggerFor(index, offset) {
+    var triggerIndex = index + offset;
+    return triggerIndex % 2 === 0 ? triggerEffects[Math.floor(triggerIndex / 2) % triggerEffects.length] : null;
+  }
+  var songAbilityPool = [
+    { type:'draw_one', label:'アンコール・ドロー', text:'登場時、デッキからカードを1枚引く。' },
+    { type:'ready_entry', label:'クイック・ライブ', text:'この楽曲はACTIVE状態で登場し、すぐ攻撃できる。' },
+    { type:'encore_on_ko', label:'ダブルアンコール', text:'相手の楽曲を倒した時、1ターンに1回だけACTIVEに戻る。' }
+  ];
+  function abilitiesForSong(index, cost) {
+    if (cost < 6) return [];
+    var abilities = [songAbilityPool[index % songAbilityPool.length]];
+    if (cost >= 7 && !abilities.some(function (ability) { return ability.type === 'ready_entry'; })) abilities.push(songAbilityPool[1]);
+    return abilities;
+  }
+  function producerCost(index) {
+    if (index < 5) return 1;
+    if (index < 10) return 2;
+    if (index < 15) return 4;
+    if (index < 18) return 6;
+    return index === 18 ? 8 : 10;
+  }
+  function abilitiesForProducer(index, cost) {
+    if (cost === 1) return [{ type:'reveal_top_cost_song', maxCost:1, label:'ルーキー・サーチ', text:'デッキの上から1枚を公開する。1コストの楽曲なら手札に加え、それ以外はデッキの下へ送る。' }];
+    if (cost >= 8) return [{ type:'destroy_all_enemy', label:'ラスト・フェスティバル', text:'相手の場の楽曲をすべて倒す。' }];
+    var patterns = [
+      [{ type:'draw_cards', count:2, label:'クリエイターズ・ドロー', text:'カードを2枚引く。' }],
+      [{ type:'power_all', amount:1000, label:'フルミックス', text:'このターン、自分の楽曲すべてをPOWER +1000。' }],
+      [{ type:'power_one', amount:2500, label:'スポットライト', text:'このターン、自分の楽曲1枚をPOWER +2500。' }],
+      [
+        { type:'draw_cards', count:1, label:'デモテープ', text:'カードを1枚引く。' },
+        { type:'power_all', amount:500, label:'マスタリング', text:'このターン、自分の楽曲すべてをPOWER +500。' }
+      ]
+    ];
+    return patterns[index % patterns.length];
+  }
 
   var songs = [];
   rawSongs.forEach(function (line, index) {
     var parts = line.split('|');
     var basePower = powerFor(index);
+    var cost = songCost(basePower);
     var videoId = verifiedVideos[parts[0]] || null;
     var artwork = verifiedArtwork[parts[0]] || null;
     var syncedMedia = root.VocaluSongMedia && root.VocaluSongMedia['song-' + String(index + 1).padStart(3, '0')] || null;
@@ -142,7 +179,8 @@
         producer: parts[1],
         rarity: rarityByQuota(index, [100, 80, 45, 15]),
         power: basePower,
-        cost: songCost(basePower),
+        cost: cost,
+        abilities: abilitiesForSong(index, cost),
         viewCount: null,
         viewCountVerifiedAt: null,
         videoUrl: videoId ? 'https://www.youtube.com/watch?v=' + videoId : artwork ? artwork.url : syncedMedia ? syncedMedia.mediaUrl : null,
@@ -156,7 +194,9 @@
 
   var producers = producerNames.map(function (name, index) {
     var profile = producerProfiles[name];
-    return { id: 'producer-' + String(index + 1).padStart(2, '0'), type: 'producer', name: name, rarity: rarityByQuota(index, [4, 6, 6, 4]), cost: 1 + index % 3, bonus: 500 + index % 4 * 500, text: '自分の楽曲を強化。制作楽曲が場にあると効果が2倍。', trigger: triggerFor(index, 0), thumbnailUrl: profile.image, thumbnailVerified: true, profileUrl: profile.source, mediaSource: profile.label, mediaVerifiedAt: '2026-10-17' };
+    var cost = producerCost(index);
+    var abilities = abilitiesForProducer(index, cost);
+    return { id: 'producer-' + String(index + 1).padStart(2, '0'), type: 'producer', name: name, rarity: rarityByQuota(index, [4, 6, 6, 4]), cost: cost, abilities: abilities, text: '1ターンに1枚だけ使える使い切りサポート。' + abilities.map(function (ability) { return ability.text; }).join(' '), trigger: triggerFor(index, 0), thumbnailUrl: profile.image, thumbnailVerified: true, profileUrl: profile.source, mediaSource: profile.label, mediaVerifiedAt: '2026-10-17' };
   });
   var singers = singerNames.map(function (name, index) {
     var profile = singerProfiles[name];

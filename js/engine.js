@@ -70,15 +70,15 @@
 
   function makeBattle(deckCards, cpuCards, rng) {
     rng = rng || Math.random;
-    function player(cards) {
+    function player(cards, openingSize, goingSecond) {
       var deck = clone(cards).sort(function () { return rng() - 0.5; });
-      var hand = deck.splice(0, 3);
+      var hand = deck.splice(0, openingSize);
       var lifeCards = deck.splice(0, 5);
-      return { life: 5, lifeCards: lifeCards, deck: deck, hand: hand, field: [], discard: [], maxCost: 0, cost: 0, producerUsed: false };
+      return { life: 5, lifeCards: lifeCards, deck: deck, hand: hand, field: [], discard: [], maxCost: 0, cost: 0, producerUsed: false, goingSecond: goingSecond, firstTurnStarted: false };
     }
     var state = { turn: 0, active: 'user', phase: 'main', winner: null, actionCount: 0, log: [], mulliganUsed: false, lastImpact: null };
-    state.user = player(deckCards);
-    state.cpu = player(cpuCards);
+    state.user = player(deckCards, 3, false);
+    state.cpu = player(cpuCards, 2, true);
     startTurn(state, 'user', false);
     return state;
   }
@@ -109,8 +109,11 @@
     p.maxCost = Math.min(10, p.maxCost + 1);
     p.cost = p.maxCost;
     p.producerUsed = false;
-    p.field.forEach(function (song) { song.attacked = false; });
-    if (drawCard !== false && p.deck.length) p.hand.push(p.deck.shift());
+    p.field.forEach(function (song) { song.attacked = false; song.encoreUsed = false; });
+    var drawCount = drawCard === false ? 0 : p.goingSecond && !p.firstTurnStarted ? 2 : 1;
+    drawCards(p, drawCount);
+    if (drawCount) state.log.unshift((p.goingSecond && !p.firstTurnStarted ? '後攻ボーナス · ' : '') + drawCount + '枚ドロー');
+    p.firstTurnStarted = true;
     state.log.unshift((side === 'user' ? 'あなた' : 'CPU') + 'のターン');
     validate(state);
   }
@@ -127,20 +130,52 @@
       p.hand.splice(handIndex, 1);
       var song = clone(card);
       song.currentPower = song.power;
-      song.attacked = p.life > 2;
+      song.turnPowerBonus = 0;
+      song.attacked = p.life > 2 && !hasAbility(song, 'ready_entry');
+      song.encoreUsed = false;
       song.singer = null;
       if (p.field.length >= 3) p.discard.push(p.field.splice(replaceIndex, 1)[0]);
       p.field.push(song);
-      state.log.unshift(card.name + ' を召喚' + (p.life <= 2 ? ' · ライフ2以下で即攻撃可能' : ''));
+      if (hasAbility(song, 'draw_one') && p.deck.length) {
+        p.hand.push(p.deck.shift());
+        state.log.unshift(card.name + '「アンコール・ドロー」· 1枚ドロー');
+      }
+      if ((card.cost || 0) >= 6) {
+        state.lastImpact = { type: 'entry', side: side, label: (song.abilities || []).map(function (ability) { return ability.label; }).join(' / ') || 'HIGH COST ENTRY' };
+      }
+      state.log.unshift(card.name + ' を召喚' + (!song.attacked ? ' · ACTIVEで登場' : ''));
     } else if (card.type === 'producer') {
       if (p.producerUsed) throw new Error('ボカロPは1ターンに1枚までです');
       p.cost -= card.cost;
       p.producerUsed = true;
       p.hand.splice(handIndex, 1);
-      var owned = p.field.some(function (song) { return song.producer === card.name; });
-      p.field.forEach(function (song) { song.currentPower += owned ? card.bonus * 2 : card.bonus; });
+      (card.abilities || []).forEach(function (ability) {
+        if (ability.type === 'draw_cards') {
+          drawCards(p, ability.count || 1);
+        } else if (ability.type === 'power_all') {
+          p.field.forEach(function (song) { song.turnPowerBonus = (song.turnPowerBonus || 0) + (ability.amount || 0); });
+        } else if (ability.type === 'power_one' && p.field.length) {
+          var powerTarget = p.field[highestPowerIndex(p.field)];
+          powerTarget.turnPowerBonus = (powerTarget.turnPowerBonus || 0) + (ability.amount || 0);
+        } else if (ability.type === 'reveal_top_cost_song' && p.deck.length) {
+          var revealed = p.deck.shift();
+          if (revealed.type === 'song' && (revealed.cost || 0) <= (ability.maxCost || 1)) {
+            p.hand.push(revealed);
+            state.log.unshift('公開した ' + revealed.name + ' を手札に加えた');
+          } else {
+            p.deck.push(revealed);
+            state.log.unshift('公開した ' + revealed.name + ' をデッキの下へ送った');
+          }
+        } else if (ability.type === 'destroy_all_enemy') {
+          var enemy = state[side === 'user' ? 'cpu' : 'user'];
+          var destroyed = enemy.field.splice(0, enemy.field.length);
+          enemy.discard = enemy.discard.concat(destroyed);
+          if (destroyed.length) state.lastImpact = { type: 'knockout', side: side === 'user' ? 'cpu' : 'user', label: 'ALL BREAK' };
+        }
+        state.log.unshift(card.name + '「' + ability.label + '」· ' + ability.text);
+      });
       p.discard.push(card);
-      state.log.unshift(card.name + ' のプロデュース効果');
+      state.log.unshift(card.name + ' をサポートとして使用 · DROPへ');
     } else {
       if (!p.field.length) throw new Error('装備する楽曲がありません');
       var target = replaceIndex == null ? 0 : replaceIndex;
@@ -153,6 +188,7 @@
       }
       p.field[target].singer = card;
       p.field[target].currentPower += card.boost;
+      state.lastImpact = { type: 'tagteam', side: side, label: 'TAG TEAM · ' + card.name };
       state.log.unshift(card.name + ' を装備');
     }
     bump(state);
@@ -171,12 +207,16 @@
     } else if (guardIndex != null && targetType === 'life' && !enemy.field[guardIndex]) {
       throw new Error('ガードする楽曲が見つかりません');
     }
+    if (targetType === 'song') {
+      var attackTarget = enemy.field[targetIndex];
+      if (!attackTarget) throw new Error('攻撃対象が見つかりません');
+      if (!attackTarget.attacked) throw new Error('ACTIVE状態の楽曲は攻撃対象にできません');
+    }
     var attackPower = attacker.currentPower;
     attacker.attacked = true;
     state.phase = 'attack';
     if (targetType === 'song') {
       var target = enemy.field[targetIndex];
-      if (!target) throw new Error('攻撃対象が見つかりません');
       var defenderIndex = targetIndex;
       if (guardIndex != null && guardIndex !== targetIndex) {
         defenderIndex = guardIndex;
@@ -187,7 +227,8 @@
         enemy.discard.push(enemy.field.splice(defenderIndex, 1)[0]);
         state.lastImpact = { type: 'knockout', side: side === 'user' ? 'cpu' : 'user' };
       }
-      if (attackPower <= targetPower) p.discard.push(p.field.splice(attackerIndex, 1)[0]);
+      if (attackPower < targetPower) p.discard.push(p.field.splice(attackerIndex, 1)[0]);
+      if (attackPower >= targetPower) readyAfterKnockout(state, side, attacker);
       state.log.unshift(attacker.name + ' が ' + defender.name + ' へ攻撃' + (defenderIndex !== targetIndex ? ' · ACTIVEガード' : ''));
     } else {
       if (guardIndex != null && enemy.field[guardIndex]) {
@@ -197,7 +238,8 @@
           enemy.discard.push(enemy.field.splice(guardIndex, 1)[0]);
           state.lastImpact = { type: 'knockout', side: side === 'user' ? 'cpu' : 'user' };
         }
-        if (attackPower <= guardPower) p.discard.push(p.field.splice(attackerIndex, 1)[0]);
+        if (attackPower < guardPower) p.discard.push(p.field.splice(attackerIndex, 1)[0]);
+        if (attackPower >= guardPower) readyAfterKnockout(state, side, attacker);
         state.log.unshift(guard.name + ' でライフをガード' + (guard.attacked ? ' · REST補正 -1000' : ''));
       } else {
         enemy.life -= 1;
@@ -216,26 +258,22 @@
     var attacker = state[attackingSide];
     if (!defender.lifeCards || !defender.lifeCards.length) return null;
     var lifeCard = defender.lifeCards.pop();
-    defender.discard.push(lifeCard);
+    defender.hand.push(lifeCard);
     if (defender.life <= 0 || lifeCard.type === 'song' || !lifeCard.trigger) return null;
 
     var effect = lifeCard.trigger.type;
-    if (effect === 'destroy_all') {
-      while (attacker.field.length) attacker.discard.push(attacker.field.pop());
-    } else if (effect === 'cost_limit') {
-      while (fieldCost(attacker.field) > 10 && attacker.field.length) {
-        var highestCost = 0;
-        for (var i = 1; i < attacker.field.length; i += 1) {
-          if ((attacker.field[i].cost || 0) > (attacker.field[highestCost].cost || 0)) highestCost = i;
-        }
-        attacker.discard.push(attacker.field.splice(highestCost, 1)[0]);
+    if (effect === 'destroy_one') {
+      if (attacker.field.length) attacker.discard.push(attacker.field.splice(highestPowerIndex(attacker.field), 1)[0]);
+    } else if (effect === 'heal_one') {
+      if (defender.life < 5 && defender.deck.length) {
+        defender.lifeCards.push(defender.deck.shift());
+        defender.life += 1;
       }
+    } else if (effect === 'discard_one') {
+      if (attacker.hand.length) attacker.discard.push(attacker.hand.pop());
     } else if (effect === 'bounce') {
       if (attacker.field.length) {
-        var highestPower = 0;
-        for (var j = 1; j < attacker.field.length; j += 1) {
-          if ((attacker.field[j].currentPower || 0) > (attacker.field[highestPower].currentPower || 0)) highestPower = j;
-        }
+        var highestPower = highestPowerIndex(attacker.field);
         var returned = attacker.field.splice(highestPower, 1)[0];
         returned.attacked = true;
         attacker.hand.push(returned);
@@ -249,17 +287,43 @@
     return state.lastTrigger;
   }
 
+  function hasAbility(card, type) {
+    return Boolean(card && (card.abilities || []).some(function (ability) { return ability.type === type; }));
+  }
+
+  function drawCards(player, count) {
+    for (var i = 0; i < count && player.deck.length; i += 1) player.hand.push(player.deck.shift());
+  }
+
+  function highestPowerIndex(field) {
+    var highestPower = 0;
+    for (var i = 1; i < field.length; i += 1) {
+      if (effectivePower(field[i]) > effectivePower(field[highestPower])) highestPower = i;
+    }
+    return highestPower;
+  }
+
+  function readyAfterKnockout(state, side, attacker) {
+    if (!hasAbility(attacker, 'encore_on_ko') || attacker.encoreUsed) return false;
+    attacker.attacked = false;
+    attacker.encoreUsed = true;
+    state.lastImpact = { type: 'encore', side: side, label: 'ダブルアンコール' };
+    state.log.unshift(attacker.name + '「ダブルアンコール」· 再攻撃可能');
+    return true;
+  }
+
   function fieldCost(field) {
     return field.reduce(function (total, card) { return total + (card.cost || 0); }, 0);
   }
 
   function effectivePower(card) {
-    return Math.max(0, (card.currentPower || card.power || 0) - (card.attacked ? 1000 : 0));
+    return Math.max(0, (card.currentPower || card.power || 0) + (card.turnPowerBonus || 0) - (card.attacked ? 1000 : 0));
   }
 
   function endTurn(state, side) {
     ensureTurn(state, side);
     if (state.winner) return state;
+    state[side].field.forEach(function (song) { song.turnPowerBonus = 0; });
     startTurn(state, side === 'user' ? 'cpu' : 'user', true);
     return state;
   }
@@ -294,7 +358,7 @@
     attackers.forEach(function (song) {
       var index = state.cpu.field.indexOf(song);
       if (index < 0 || song.attacked || state.winner) return;
-      var weakTarget = state.user.field.findIndex(function (target) { return song.currentPower >= effectivePower(target); });
+      var weakTarget = state.user.field.findIndex(function (target) { return target.attacked && song.currentPower >= effectivePower(target); });
       if (weakTarget >= 0 && state.user.life > 1) attack(state, 'cpu', index, 'song', weakTarget);
       else {
         attack(state, 'cpu', index, 'life', null, guardAvailable);
