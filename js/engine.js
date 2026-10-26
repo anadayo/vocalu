@@ -103,16 +103,18 @@
 
   function startTurn(state, side, drawCard) {
     var p = state[side];
+    var secondPlayerOpening = p.goingSecond && !p.firstTurnStarted;
     state.turn += side === 'user' ? 1 : 0;
     state.active = side;
     state.phase = 'main';
-    p.maxCost = Math.min(10, p.maxCost + 1);
+    p.maxCost = Math.min(10, p.maxCost + 1 + (secondPlayerOpening ? 1 : 0));
     p.cost = p.maxCost;
     p.producerUsed = false;
     p.field.forEach(function (song) { song.attacked = false; song.encoreUsed = false; });
-    var drawCount = drawCard === false ? 0 : p.goingSecond && !p.firstTurnStarted ? 2 : 1;
+    var drawCount = drawCard === false ? 0 : secondPlayerOpening ? 2 : 1;
     drawCards(p, drawCount);
-    if (drawCount) state.log.unshift((p.goingSecond && !p.firstTurnStarted ? '後攻ボーナス · ' : '') + drawCount + '枚ドロー');
+    if (secondPlayerOpening) state.log.unshift('後攻ボーナス · 葱COST +1');
+    if (drawCount) state.log.unshift((secondPlayerOpening ? '後攻ボーナス · ' : '') + drawCount + '枚ドロー');
     p.firstTurnStarted = true;
     state.log.unshift((side === 'user' ? 'あなた' : 'CPU') + 'のターン');
     validate(state);
