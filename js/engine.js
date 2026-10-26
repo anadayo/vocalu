@@ -151,6 +151,7 @@
       p.cost -= card.cost;
       p.producerUsed = true;
       p.hand.splice(handIndex, 1);
+      var supportEvent = { side: side, cardId: card.id, cardName: card.name, abilities: clone(card.abilities || []), revealed: null };
       (card.abilities || []).forEach(function (ability) {
         if (ability.type === 'draw_cards') {
           drawCards(p, ability.count || 1);
@@ -163,9 +164,11 @@
           var revealed = p.deck.shift();
           if (revealed.type === 'song' && (revealed.cost || 0) <= (ability.maxCost || 1)) {
             p.hand.push(revealed);
+            supportEvent.revealed = { cardId: revealed.id, outcome: 'hand', label: '手札に加える' };
             state.log.unshift('公開した ' + revealed.name + ' を手札に加えた');
           } else {
             p.deck.push(revealed);
+            supportEvent.revealed = { cardId: revealed.id, outcome: 'bottom', label: 'デッキの下へ送る' };
             state.log.unshift('公開した ' + revealed.name + ' をデッキの下へ送った');
           }
         } else if (ability.type === 'destroy_all_enemy') {
@@ -176,6 +179,7 @@
         }
         state.log.unshift(card.name + '「' + ability.label + '」· ' + ability.text);
       });
+      state.lastSupport = supportEvent;
       p.discard.push(card);
       state.log.unshift(card.name + ' をサポートとして使用 · DROPへ');
     } else {

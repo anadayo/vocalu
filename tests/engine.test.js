@@ -203,6 +203,8 @@ producerScout.user.hand = [{...global.VocaluCatalog.producers.find(c => c.cost =
 producerScout.user.deck = [{...strongDeck[0],cost:1},...producerScout.user.deck];
 assert.doesNotThrow(()=>E.playCard(producerScout,'user',0,0),'a one-cost producer can be used on the first player opening turn');
 assert.equal(producerScout.user.hand.some(c => c.type === 'song' && c.cost === 1),true,'one-cost producer adds a revealed one-cost song to hand');
+assert.equal(producerScout.lastSupport.revealed.outcome,'hand','matching deck-top reveal reports the hand destination to the UI');
+assert.equal(producerScout.lastSupport.revealed.cardId,strongDeck[0].id,'matching deck-top reveal reports the exact card to the UI');
 
 const producerMiss = E.makeBattle(strongDeck, weakDeck, () => 0.1);
 producerMiss.user.hand = [{...global.VocaluCatalog.producers.find(c => c.cost === 1)}];
@@ -211,6 +213,7 @@ const missDeckSize = producerMiss.user.deck.length;
 E.playCard(producerMiss,'user',0,0);
 assert.equal(producerMiss.user.hand.length,0,'a revealed nonmatching song is not added to hand');
 assert.equal(producerMiss.user.deck.length,missDeckSize,'a revealed nonmatching song moves to the bottom without changing deck size');
+assert.equal(producerMiss.lastSupport.revealed.outcome,'bottom','nonmatching deck-top reveal reports the bottom-deck destination to the UI');
 
 const producerWipe = E.makeBattle(strongDeck, weakDeck, () => 0.1);
 producerWipe.user.cost = 10;
