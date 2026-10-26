@@ -117,14 +117,17 @@ equalPowerBattle.user.field = [{...strongDeck[0],currentPower:3000,attacked:fals
 equalPowerBattle.cpu.field = [{...weakDeck[0],currentPower:4000,attacked:true}];
 E.attack(equalPowerBattle,'user',0,'song',0,null);
 assert.equal(equalPowerBattle.cpu.field.length,0,'equal-power attack destroys the defending REST card');
-assert.equal(equalPowerBattle.user.field.length,1,'equal-power attack leaves the attacker in play');
+assert.equal(equalPowerBattle.user.field.length,0,'equal-power attack also destroys the attacker');
+assert.equal(equalPowerBattle.user.discard.length,1,'equal-power attacker is sent to discard');
+assert.equal(equalPowerBattle.lastImpact.type,'clash','equal-power attack exposes the clash animation state');
 
 const equalPowerGuard = E.makeBattle(strongDeck, weakDeck, () => 0.1);
 equalPowerGuard.user.field = [{...strongDeck[0],currentPower:3000,attacked:false}];
 equalPowerGuard.cpu.field = [{...weakDeck[0],currentPower:3000,attacked:false}];
 E.attack(equalPowerGuard,'user',0,'life',null,0);
 assert.equal(equalPowerGuard.cpu.field.length,0,'equal-power attack destroys a life guard');
-assert.equal(equalPowerGuard.user.field.length,1,'equal-power guard battle leaves the attacker in play');
+assert.equal(equalPowerGuard.user.field.length,0,'equal-power guard battle also destroys the attacker');
+assert.equal(equalPowerGuard.user.discard.length,1,'equal-power guard battle sends the attacker to discard');
 assert.equal(equalPowerGuard.cpu.life,5,'a defeated equal-power guard still protects life');
 
 const activeTarget = E.makeBattle(strongDeck, weakDeck, () => 0.1);

@@ -190,7 +190,7 @@
     var userSlots=[0,1,2].map(function(i){return slotHtml(u.field[i],i,'user');}).join('');
     var hand=u.hand.map(function(card,i){return handHtml(card,i,u.hand.length,userActive,u.cost);}).join('');
     var targeting=state.targeting!=null?'<div class="target-guide">点線の先にある対象をタップ<span class="attack-arrow">↑</span><button data-action="cancel-action">取消</button></div><div class="attack-vector"><i></i></div>':'';
-    var impactLabels={life:'LIFE BREAK',knockout:'KNOCKOUT',entry:'HIGH COST ENTRY',encore:'ENCORE ATTACK',tagteam:'TAG TEAM'};
+    var impactLabels={life:'LIFE BREAK',knockout:'KNOCKOUT',clash:'DOUBLE DROP',entry:'HIGH COST ENTRY',encore:'ENCORE ATTACK',tagteam:'TAG TEAM'};
     var impactHtml=impact?'<div class="impact-effect ' + impact.type + '"><b>' + esc(impact.label||impactLabels[impact.type]||'IMPACT') + '</b></div>':'';
     var board='<section class="battle-center"><header class="battle-status"><span>TURN ' + b.turn + '</span><b class="' + (userActive?'user-turn':'cpu-turn') + '">' + (userActive?'YOUR TURN':'CPU TURN') + '</b><span>' + difficultyName() + '</span></header>' + targeting
       + '<div class="battle-zone player-row enemy mirrored">' + pileHtml(c,'cpu') + '<div class="battle-core">' + compactHand(c,'cpu') + '<div class="battle-field enemy-field">' + cpuSlots + '</div></div>' + lifeRail(c,'cpu') + '</div>'

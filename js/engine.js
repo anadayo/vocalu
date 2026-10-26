@@ -223,24 +223,34 @@
       }
       var defender = enemy.field[defenderIndex];
       var targetPower = effectivePower(defender);
-      if (attackPower >= targetPower) {
+      if (attackPower > targetPower) {
         enemy.discard.push(enemy.field.splice(defenderIndex, 1)[0]);
         state.lastImpact = { type: 'knockout', side: side === 'user' ? 'cpu' : 'user' };
       }
       if (attackPower < targetPower) p.discard.push(p.field.splice(attackerIndex, 1)[0]);
-      if (attackPower >= targetPower) readyAfterKnockout(state, side, attacker);
-      state.log.unshift(attacker.name + ' が ' + defender.name + ' へ攻撃' + (defenderIndex !== targetIndex ? ' · ACTIVEガード' : ''));
+      if (attackPower === targetPower) {
+        enemy.discard.push(enemy.field.splice(defenderIndex, 1)[0]);
+        p.discard.push(p.field.splice(attackerIndex, 1)[0]);
+        state.lastImpact = { type: 'clash', label: 'DOUBLE DROP' };
+      }
+      if (attackPower > targetPower) readyAfterKnockout(state, side, attacker);
+      state.log.unshift(attacker.name + ' が ' + defender.name + ' へ攻撃' + (defenderIndex !== targetIndex ? ' · ACTIVEガード' : '') + (attackPower === targetPower ? ' · 相打ち' : ''));
     } else {
       if (guardIndex != null && enemy.field[guardIndex]) {
         var guard = enemy.field[guardIndex];
         var guardPower = effectivePower(guard);
-        if (attackPower >= guardPower) {
+        if (attackPower > guardPower) {
           enemy.discard.push(enemy.field.splice(guardIndex, 1)[0]);
           state.lastImpact = { type: 'knockout', side: side === 'user' ? 'cpu' : 'user' };
         }
         if (attackPower < guardPower) p.discard.push(p.field.splice(attackerIndex, 1)[0]);
-        if (attackPower >= guardPower) readyAfterKnockout(state, side, attacker);
-        state.log.unshift(guard.name + ' でライフをガード' + (guard.attacked ? ' · REST補正 -1000' : ''));
+        if (attackPower === guardPower) {
+          enemy.discard.push(enemy.field.splice(guardIndex, 1)[0]);
+          p.discard.push(p.field.splice(attackerIndex, 1)[0]);
+          state.lastImpact = { type: 'clash', label: 'DOUBLE DROP' };
+        }
+        if (attackPower > guardPower) readyAfterKnockout(state, side, attacker);
+        state.log.unshift(guard.name + ' でライフをガード' + (guard.attacked ? ' · REST補正 -1000' : '') + (attackPower === guardPower ? ' · 相打ち' : ''));
       } else {
         enemy.life -= 1;
         state.lastImpact = { type: 'life', side: side === 'user' ? 'cpu' : 'user' };
