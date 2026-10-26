@@ -246,6 +246,7 @@ function makeTriggerBattle(type) {
   assert.equal(state.cpu.hand.some(c => c.id === support.id),true,type + ' life support enters hand');
   assert.equal(state.cpu.discard.some(c => c.id === support.id),false,type + ' life support does not enter discard');
   assert.equal(state.lastTrigger.type,type,type + ' trigger is reported to the UI');
+  assert.equal(state.lastTrigger.cardId,support.id,type + ' trigger reports the exact revealed card');
   return state;
 }
 

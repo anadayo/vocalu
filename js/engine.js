@@ -294,7 +294,7 @@
       attacker.field.forEach(function (song) { song.attacked = true; });
     }
 
-    state.lastTrigger = { side: defendingSide, cardName: lifeCard.name, label: lifeCard.trigger.label, text: lifeCard.trigger.text, type: effect };
+    state.lastTrigger = { side: defendingSide, cardId: lifeCard.id, cardName: lifeCard.name, label: lifeCard.trigger.label, text: lifeCard.trigger.text, type: effect };
     state.log.unshift('TRIGGER · ' + lifeCard.name + '「' + lifeCard.trigger.label + '」');
     return state.lastTrigger;
   }
