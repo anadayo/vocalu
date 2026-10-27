@@ -7,6 +7,7 @@
   var STORAGE = 'vocalu-save-v1';
   var MIGRATION = 'vocalu-migration-v3';
   var RANK_STORAGE = 'vocalu-rank-v1';
+  var RANK_BOARD_STORAGE = 'vocalu-rank-board-v1';
   var state = {
     screen: 'home', opened: [], packNo: 0, selected: [], battle: null,
     selectedUnit: null, targeting: null, pendingAttack: null, panelTab: 'log', triggerResume: null, mulliganSelected: [],
@@ -26,13 +27,46 @@
     var saved = {};
     try { saved = JSON.parse(localStorage.getItem(RANK_STORAGE) || '{}'); } catch (ignore) {}
     return {
+      username: String(saved.username || '').trim().slice(0, 12),
       rating: Math.max(0, Number(saved.rating) || 1000),
       wins: Math.max(0, Number(saved.wins) || 0),
       losses: Math.max(0, Number(saved.losses) || 0)
     };
   }
-  function saveRank() { try { localStorage.setItem(RANK_STORAGE, JSON.stringify(state.rank)); } catch (ignore) {} }
+  function loadRankBoard() {
+    var entries = [];
+    try { entries = JSON.parse(localStorage.getItem(RANK_BOARD_STORAGE) || '[]'); } catch (ignore) {}
+    return Array.isArray(entries) ? entries.filter(function (entry) { return entry && entry.username; }).slice(0, 30) : [];
+  }
+  function saveRank() {
+    try {
+      localStorage.setItem(RANK_STORAGE, JSON.stringify(state.rank));
+      if (!state.rank.username) return;
+      var board = loadRankBoard().filter(function (entry) { return entry.username !== state.rank.username; });
+      board.push({ username: state.rank.username, rating: state.rank.rating, wins: state.rank.wins, losses: state.rank.losses, updatedAt: Date.now() });
+      board.sort(function (a, b) { return b.rating - a.rating || b.wins - a.wins; });
+      localStorage.setItem(RANK_BOARD_STORAGE, JSON.stringify(board.slice(0, 30)));
+    } catch (ignore) {}
+  }
   function rankName(rating) { return rating >= 1700 ? 'MASTER' : rating >= 1500 ? 'PLATINUM' : rating >= 1300 ? 'GOLD' : rating >= 1100 ? 'SILVER' : 'BRONZE'; }
+  function rankRegistration(startAfterSave) {
+    choose('ランクネーム登録','<p class="notice">ランキングに表示するユーザーネームだけを登録します。メールアドレスは不要です。</p><label class="rank-name-field"><span>USER NAME</span><input data-rank-name maxlength="12" autocomplete="nickname" value="' + esc(state.rank.username) + '" placeholder="1～12文字"></label><button class="primary" data-action="save-rank-name" data-start="' + (startAfterSave ? 'ranked' : '') + '">登録する</button>');
+  }
+  function saveRankName(value) {
+    var name = String(value || '').replace(/\s+/g, ' ').trim();
+    if (!name || name.length > 12) throw new Error('ユーザーネームは1～12文字で入力してください');
+    if (/[<>&"']/.test(name)) throw new Error('使用できない記号が含まれています');
+    state.rank.username = name;
+    saveRank();
+  }
+  function leaderboardHtml() {
+    var board = loadRankBoard();
+    if (state.rank.username && !board.some(function (entry) { return entry.username === state.rank.username; })) board.push(state.rank);
+    board.sort(function (a, b) { return b.rating - a.rating || b.wins - a.wins; });
+    var rows = board.slice(0, 5).map(function (entry, index) { return '<div class="leaderboard-row ' + (entry.username === state.rank.username ? 'is-you' : '') + '"><b>' + (index + 1) + '</b><span>' + esc(entry.username) + '</span><strong>' + Math.max(0, Number(entry.rating) || 1000) + ' pt</strong></div>'; }).join('');
+    if (!rows) rows = '<p class="leaderboard-empty">ユーザーネームを登録すると最初の記録が載ります。</p>';
+    return '<section class="leaderboard"><header><div><span>PRESEASON · LOCAL</span><h2>RANKING</h2></div><button data-action="edit-rank-name">' + (state.rank.username ? esc(state.rank.username) : '名前を登録') + '</button></header><div class="leaderboard-head"><span>#</span><span>USER</span><span>POINT</span></div>' + rows + '<p class="leaderboard-note">現在はこの端末のプレシーズン記録です。オンラインランキング接続後も同じユーザーネームを使えます。</p></section>';
+  }
   function beginMatch(mode) {
     state.matchMode=mode;
     state.difficulty=mode==='ranked'?'expert':'normal';
@@ -110,7 +144,7 @@
   }
   function renderHome() {
     var owned = Object.keys(state.collection).filter(function (id) { return state.collection[id] > 0; }).length;
-    app.innerHTML = shell('<section class="lobby"><div class="lobby-mast"><div class="lobby-title"><span>VOCALU BATTLE LOBBY</span><h1>ボカる！</h1><p>開けて、組んで、歌わせる。</p></div><img class="lobby-pack" src="assets/bc01-pack.webp" alt="VOCALU BC01"></div><div class="mode-select"><button class="mode-tile ranked" data-action="ranked-match"><span class="mode-index">01</span><span class="mode-copy"><small>CPU LADDER</small><strong>ランクマッチ</strong><em>勝敗でレートが変動</em></span><span class="mode-status"><b>' + rankName(state.rank.rating) + '</b><small>RATE ' + state.rank.rating + '</small></span></button><button class="mode-tile free" data-action="free-match"><span class="mode-index">02</span><span class="mode-copy"><small>CASUAL BATTLE</small><strong>フリーマッチ</strong><em>CPU難易度を選んで対戦</em></span><span class="mode-arrow" aria-hidden="true">›</span></button><button class="mode-tile collection" data-action="collection"><span class="mode-index">03</span><span class="mode-copy"><small>CARD LIBRARY</small><strong>コレクション</strong><em>楽曲の再生とカード確認</em></span><span class="mode-status"><b>' + owned + '</b><small>/ 300</small></span></button></div><div class="lobby-record"><span>RANK RECORD</span><b>' + state.rank.wins + ' WIN</b><b>' + state.rank.losses + ' LOSS</b><button data-action="share-x">Xで共有</button><button data-action="toggle-light">軽量モード ' + (state.light ? 'ON' : 'OFF') + '</button></div></section>' + testPanel());
+    app.innerHTML = shell('<section class="lobby"><div class="lobby-mast"><div class="lobby-title"><span>VOCALU BATTLE LOBBY</span><h1>ボカる！</h1><p>開けて、組んで、歌わせる。</p></div><img class="lobby-pack" src="assets/bc01-pack.webp" alt="VOCALU BC01"></div><div class="mode-select"><button class="mode-tile ranked" data-action="ranked-match"><span class="mode-index">01</span><span class="mode-copy"><small>CPU LADDER</small><strong>ランクマッチ</strong><em>勝敗でレートが変動</em></span><span class="mode-status"><b>' + rankName(state.rank.rating) + '</b><small>RATE ' + state.rank.rating + '</small></span></button><button class="mode-tile free" data-action="free-match"><span class="mode-index">02</span><span class="mode-copy"><small>CASUAL BATTLE</small><strong>フリーマッチ</strong><em>CPU難易度を選んで対戦</em></span><span class="mode-arrow" aria-hidden="true">›</span></button><button class="mode-tile collection" data-action="collection"><span class="mode-index">03</span><span class="mode-copy"><small>CARD LIBRARY</small><strong>コレクション</strong><em>楽曲の再生とカード確認</em></span><span class="mode-status"><b>' + owned + '</b><small>/ 300</small></span></button></div><div class="lobby-record"><span>RANK RECORD</span><b>' + state.rank.wins + ' WIN</b><b>' + state.rank.losses + ' LOSS</b><button data-action="share-x">Xで共有</button><button data-action="toggle-light">軽量モード ' + (state.light ? 'ON' : 'OFF') + '</button></div>' + leaderboardHtml() + '</section>' + testPanel());
   }
   function testPanel() {
     if (!testMode) return '';
@@ -162,7 +196,7 @@
   function lifeCards(player,side) { var cards='';for(var i=0;i<player.life;i+=1)cards+='<span class="life-card">V</span>';var incoming=side==='user'&&state.pendingAttack&&state.pendingAttack.targetType==='life';return '<button class="life-target ' + (side==='cpu'&&state.targeting!=null?'targetable ':'') + (incoming?'under-attack ':'') + '" ' + (side==='cpu'&&state.targeting!=null?'data-action="attack-life"':'disabled') + '><b>LIFE ' + player.life + '</b><span class="life-cards">' + cards + '</span></button>'; }
   function pileHtml(player,side){
     var recent=player.discard.slice(-3).reverse(),dropCards=recent.map(function(card,index){return '<i class="discard-preview-card" style="--drop-index:' + index + '">' + artHtml(card) + '</i>';}).join('');
-    return '<div class="pile-zone ' + side + '"><button class="pile-card drop" data-action="show-discard" data-side="' + side + '" aria-label="' + (side==='user'?'あなた':'CPU') + 'のドロップを見る"><span>DROP</span><span class="discard-stack">' + (dropCards||'<i class="discard-empty">EMPTY</i>') + '</span></button><div class="pile-card deck"><span>DECK</span><span class="deck-back"><b>ボカる！</b><small>VOCALU</small></span><em>' + player.deck.length + '</em></div></div>';
+    return '<div class="pile-zone ' + side + '"><button class="pile-card drop" data-action="show-discard" data-side="' + side + '" aria-label="' + (side==='user'?'あなた':'CPU') + 'のドロップを見る"><span>DROP</span><span class="discard-stack">' + (dropCards||'<i class="discard-empty">EMPTY</i>') + '</span></button><div class="pile-card deck"><span>DECK</span><span class="deck-back"><b>V</b><small>VOCALU</small></span><em>' + player.deck.length + '</em></div></div>';
   }
   function leekMeter(player){var leaves='';for(var i=0;i<player.maxCost;i+=1)leaves+='<i class="leek-icon ' + (i<player.cost?'ready':'spent') + '"></i>';return '<div class="leek-meter"><span>葱 COST</span><b>' + player.cost + '/' + player.maxCost + '</b><div>' + leaves + '</div></div>';}
   function compactHand(player,side){
@@ -254,7 +288,9 @@
 
   document.addEventListener('click',function(event){var button=event.target.closest('[data-action]');if(!button)return;var action=button.dataset.action;try{
     if(action==='start'||action==='free-match')beginMatch('free');
-    else if(action==='ranked-match')beginMatch('ranked');
+    else if(action==='ranked-match'){if(state.rank.username)beginMatch('ranked');else rankRegistration(true);}
+    else if(action==='edit-rank-name')rankRegistration(false);
+    else if(action==='save-rank-name'){var rankInput=button.closest('.dialog').querySelector('[data-rank-name]');saveRankName(rankInput&&rankInput.value);var shouldStart=button.dataset.start==='ranked';button.closest('.modal').remove();track('vocalu_rank_name_register',{location:shouldStart?'rank_start':'lobby'});if(shouldStart)beginMatch('ranked');else render();}
     else if(action==='open-pack'){button.classList.add('opening');setTimeout(function(){revealPack(VocaluEngine.openPack(VocaluCatalog.cards));},state.light?20:500);}
     else if(action==='bulk-open'){while(state.packNo<5){state.opened=state.opened.concat(VocaluEngine.openPack(VocaluCatalog.cards));state.packNo+=1;}state.screen='deck';state.selected=VocaluEngine.autoBuild(state.opened);render();}
     else if(action==='next-pack'){state.screen=state.packNo<5?'pack':'deck';if(state.screen==='deck')state.selected=VocaluEngine.autoBuild(state.opened);render();}
@@ -302,7 +338,7 @@
     else if(action==='music-down'||action==='music-up'){state.music.volume=Math.max(0,Math.min(100,state.music.volume+(action==='music-up'?10:-10)));if(yt&&state.music.ready)yt.setVolume(state.music.volume);button.closest('.modal').remove();musicControls();}
     else if(action==='detail')cardDetail(button.dataset.card);
     else if(action==='force-rare'){var forced=VocaluCatalog.cards.find(function(c){return c.rarity===button.dataset.rare;});flash(button.dataset.rare);choose(button.dataset.rare+'演出確認',cardHtml(forced,-1,false));}
-    else if(action==='reset-save'){localStorage.removeItem(STORAGE);localStorage.removeItem(MIGRATION);localStorage.removeItem(RANK_STORAGE);state.collection={};state.rank={rating:1000,wins:0,losses:0};render();}
+    else if(action==='reset-save'){localStorage.removeItem(STORAGE);localStorage.removeItem(MIGRATION);localStorage.removeItem(RANK_STORAGE);localStorage.removeItem(RANK_BOARD_STORAGE);state.collection={};state.rank={username:'',rating:1000,wins:0,losses:0};render();}
   }catch(err){toast(err.message||'操作を続けられませんでした');console.error(err);}});
   document.addEventListener('input',function(event){if(!event.target.matches('[data-volume]'))return;state.music.volume=Number(event.target.value);var label=event.target.closest('.dialog').querySelector('[data-volume-label]');if(label)label.textContent=state.music.volume;if(yt&&state.music.ready)yt.setVolume(state.music.volume);});
   var startY=0;app.addEventListener('touchstart',function(e){var p=e.target.closest('[data-action="open-pack"]');if(p&&e.touches[0])startY=e.touches[0].clientY;},{passive:true});app.addEventListener('touchend',function(e){var p=e.target.closest('[data-action="open-pack"]');if(p&&e.changedTouches[0]&&startY-e.changedTouches[0].clientY>35)p.click();},{passive:true});
