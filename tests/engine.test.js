@@ -19,7 +19,7 @@ assert.equal(global.VocaluCatalog.producers.filter(c => c.trigger && c.trigger.t
 assert.equal(global.VocaluCatalog.singers.filter(c => c.trigger && c.trigger.type).length, 20, 'half of singers have reversal triggers');
 assert.equal(global.VocaluCatalog.producers.filter(c => c.abilities && c.abilities.length).length, 20, 'all producers have support effects');
 assert.ok(global.VocaluCatalog.producers.some(c => c.abilities.length > 1), 'some producers have multi-line support effects');
-assert.deepEqual(global.VocaluCatalog.producers.reduce((a,c)=>(a[c.cost]=(a[c.cost]||0)+1,a),{}), {1:10,2:10}, 'producer costs are limited to one or two');
+assert.equal(global.VocaluCatalog.producers.every(c => c.cost === 0), true, 'all producer cards cost zero');
 assert.deepEqual([...new Set(global.VocaluCatalog.cards.filter(c => c.trigger).map(c => c.trigger.type))].sort(), ['bounce','destroy_one','discard_one','heal_one','stop_attacks'].sort(), 'support trigger pool includes reversal effects');
 assert.ok(global.VocaluCatalog.songs.filter(c => c.cost >= 6).every(c => c.abilities && c.abilities.length), 'all high-cost songs have an ability');
 assert.ok(global.VocaluCatalog.songs.filter(c => c.cost < 6).every(c => !c.abilities.length), 'low-cost songs do not receive high-cost abilities');
@@ -200,15 +200,15 @@ producerDraw.user.hand.unshift({...global.VocaluCatalog.producers[1]});
 assert.throws(()=>E.playCard(producerDraw,'user',0,0),/1ターンに1枚/,'only one producer can be used each turn');
 
 const producerScout = E.makeBattle(strongDeck, weakDeck, () => 0.1);
-producerScout.user.hand = [{...global.VocaluCatalog.producers.find(c => c.cost === 1)}];
+producerScout.user.hand = [{...global.VocaluCatalog.producers.find(c => c.abilities.some(a => a.type === 'reveal_top_cost_song'))}];
 producerScout.user.deck = [{...strongDeck[0],cost:1},...producerScout.user.deck];
-assert.doesNotThrow(()=>E.playCard(producerScout,'user',0,0),'a one-cost producer can be used on the first player opening turn');
-assert.equal(producerScout.user.hand.some(c => c.type === 'song' && c.cost === 1),true,'one-cost producer adds a revealed one-cost song to hand');
+assert.doesNotThrow(()=>E.playCard(producerScout,'user',0,0),'a zero-cost producer can be used on the first player opening turn');
+assert.equal(producerScout.user.hand.some(c => c.type === 'song' && c.cost === 1),true,'zero-cost producer adds a revealed one-cost song to hand');
 assert.equal(producerScout.lastSupport.revealed.outcome,'hand','matching deck-top reveal reports the hand destination to the UI');
 assert.equal(producerScout.lastSupport.revealed.cardId,strongDeck[0].id,'matching deck-top reveal reports the exact card to the UI');
 
 const producerMiss = E.makeBattle(strongDeck, weakDeck, () => 0.1);
-producerMiss.user.hand = [{...global.VocaluCatalog.producers.find(c => c.cost === 1)}];
+producerMiss.user.hand = [{...global.VocaluCatalog.producers.find(c => c.abilities.some(a => a.type === 'reveal_top_cost_song'))}];
 producerMiss.user.deck = [{...strongDeck[0],cost:2},...producerMiss.user.deck];
 const missDeckSize = producerMiss.user.deck.length;
 E.playCard(producerMiss,'user',0,0);
