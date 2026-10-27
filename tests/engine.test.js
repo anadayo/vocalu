@@ -19,6 +19,7 @@ assert.equal(global.VocaluCatalog.producers.filter(c => c.trigger && c.trigger.t
 assert.equal(global.VocaluCatalog.singers.filter(c => c.trigger && c.trigger.type).length, 20, 'half of singers have reversal triggers');
 assert.equal(global.VocaluCatalog.producers.filter(c => c.abilities && c.abilities.length).length, 20, 'all producers have support effects');
 assert.ok(global.VocaluCatalog.producers.some(c => c.abilities.length > 1), 'some producers have multi-line support effects');
+assert.deepEqual(global.VocaluCatalog.producers.reduce((a,c)=>(a[c.cost]=(a[c.cost]||0)+1,a),{}), {1:10,2:10}, 'producer costs are limited to one or two');
 assert.deepEqual([...new Set(global.VocaluCatalog.cards.filter(c => c.trigger).map(c => c.trigger.type))].sort(), ['bounce','destroy_one','discard_one','heal_one','stop_attacks'].sort(), 'support trigger pool includes reversal effects');
 assert.ok(global.VocaluCatalog.songs.filter(c => c.cost >= 6).every(c => c.abilities && c.abilities.length), 'all high-cost songs have an ability');
 assert.ok(global.VocaluCatalog.songs.filter(c => c.cost < 6).every(c => !c.abilities.length), 'low-cost songs do not receive high-cost abilities');
@@ -214,15 +215,6 @@ E.playCard(producerMiss,'user',0,0);
 assert.equal(producerMiss.user.hand.length,0,'a revealed nonmatching song is not added to hand');
 assert.equal(producerMiss.user.deck.length,missDeckSize,'a revealed nonmatching song moves to the bottom without changing deck size');
 assert.equal(producerMiss.lastSupport.revealed.outcome,'bottom','nonmatching deck-top reveal reports the bottom-deck destination to the UI');
-
-const producerWipe = E.makeBattle(strongDeck, weakDeck, () => 0.1);
-producerWipe.user.cost = 10;
-producerWipe.user.maxCost = 10;
-producerWipe.user.hand = [{...global.VocaluCatalog.producers.find(c => c.cost >= 8)}];
-producerWipe.cpu.field = [{...weakDeck[0],currentPower:1000},{...weakDeck[1],currentPower:1000},{...weakDeck[2],currentPower:1000}];
-E.playCard(producerWipe,'user',0,0);
-assert.equal(producerWipe.cpu.field.length,0,'high-cost producer destroys every opposing field card');
-assert.equal(producerWipe.cpu.discard.length,3,'destroyed opposing cards move to discard');
 
 const producerPower = E.makeBattle(strongDeck, weakDeck, () => 0.1);
 producerPower.user.cost = 10;

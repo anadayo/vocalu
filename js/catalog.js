@@ -143,15 +143,10 @@
     return abilities;
   }
   function producerCost(index) {
-    if (index < 5) return 1;
-    if (index < 10) return 2;
-    if (index < 15) return 4;
-    if (index < 18) return 6;
-    return index === 18 ? 8 : 10;
+    return index < 10 ? 1 : 2;
   }
   function abilitiesForProducer(index, cost) {
     if (cost === 1) return [{ type:'reveal_top_cost_song', maxCost:1, label:'ルーキー・サーチ', text:'デッキの上から1枚を公開する。1コストの楽曲なら手札に加え、それ以外はデッキの下へ送る。' }];
-    if (cost >= 8) return [{ type:'destroy_all_enemy', label:'ラスト・フェスティバル', text:'相手の場の楽曲をすべて倒す。' }];
     var patterns = [
       [{ type:'draw_cards', count:2, label:'クリエイターズ・ドロー', text:'カードを2枚引く。' }],
       [{ type:'power_all', amount:1000, label:'フルミックス', text:'このターン、自分の楽曲すべてをPOWER +1000。' }],
