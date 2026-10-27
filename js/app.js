@@ -17,6 +17,11 @@
   var yt = null;
   var renderedScreen = null;
 
+  function track(name, params) {
+    if (!window.VOCALU_ANALYTICS_ENABLED || typeof window.gtag !== 'function') return;
+    window.gtag('event', name, params || {});
+  }
+
   function loadRank() {
     var saved = {};
     try { saved = JSON.parse(localStorage.getItem(RANK_STORAGE) || '{}'); } catch (ignore) {}
@@ -32,6 +37,7 @@
     state.matchMode=mode;
     state.difficulty=mode==='ranked'?'expert':'normal';
     state.opened=[];state.packNo=0;state.selected=[];state.battle=null;state.pendingAttack=null;
+    track('vocalu_mode_start',{mode:mode});
     state.screen='pack';render();
   }
 
@@ -104,7 +110,7 @@
   }
   function renderHome() {
     var owned = Object.keys(state.collection).filter(function (id) { return state.collection[id] > 0; }).length;
-    app.innerHTML = shell('<section class="lobby"><div class="lobby-mast"><div class="lobby-title"><span>VOCALU BATTLE LOBBY</span><h1>ボカる！</h1><p>開けて、組んで、歌わせる。</p></div><img class="lobby-pack" src="assets/bc01-pack.webp" alt="VOCALU BC01"></div><div class="mode-select"><button class="mode-tile ranked" data-action="ranked-match"><span class="mode-index">01</span><span class="mode-copy"><small>CPU LADDER</small><strong>ランクマッチ</strong><em>勝敗でレートが変動</em></span><span class="mode-status"><b>' + rankName(state.rank.rating) + '</b><small>RATE ' + state.rank.rating + '</small></span></button><button class="mode-tile free" data-action="free-match"><span class="mode-index">02</span><span class="mode-copy"><small>CASUAL BATTLE</small><strong>フリーマッチ</strong><em>CPU難易度を選んで対戦</em></span><span class="mode-arrow" aria-hidden="true">›</span></button><button class="mode-tile collection" data-action="collection"><span class="mode-index">03</span><span class="mode-copy"><small>CARD LIBRARY</small><strong>コレクション</strong><em>楽曲の再生とカード確認</em></span><span class="mode-status"><b>' + owned + '</b><small>/ 300</small></span></button></div><div class="lobby-record"><span>RANK RECORD</span><b>' + state.rank.wins + ' WIN</b><b>' + state.rank.losses + ' LOSS</b><button data-action="toggle-light">軽量モード ' + (state.light ? 'ON' : 'OFF') + '</button></div></section>' + testPanel());
+    app.innerHTML = shell('<section class="lobby"><div class="lobby-mast"><div class="lobby-title"><span>VOCALU BATTLE LOBBY</span><h1>ボカる！</h1><p>開けて、組んで、歌わせる。</p></div><img class="lobby-pack" src="assets/bc01-pack.webp" alt="VOCALU BC01"></div><div class="mode-select"><button class="mode-tile ranked" data-action="ranked-match"><span class="mode-index">01</span><span class="mode-copy"><small>CPU LADDER</small><strong>ランクマッチ</strong><em>勝敗でレートが変動</em></span><span class="mode-status"><b>' + rankName(state.rank.rating) + '</b><small>RATE ' + state.rank.rating + '</small></span></button><button class="mode-tile free" data-action="free-match"><span class="mode-index">02</span><span class="mode-copy"><small>CASUAL BATTLE</small><strong>フリーマッチ</strong><em>CPU難易度を選んで対戦</em></span><span class="mode-arrow" aria-hidden="true">›</span></button><button class="mode-tile collection" data-action="collection"><span class="mode-index">03</span><span class="mode-copy"><small>CARD LIBRARY</small><strong>コレクション</strong><em>楽曲の再生とカード確認</em></span><span class="mode-status"><b>' + owned + '</b><small>/ 300</small></span></button></div><div class="lobby-record"><span>RANK RECORD</span><b>' + state.rank.wins + ' WIN</b><b>' + state.rank.losses + ' LOSS</b><button data-action="share-x">Xで共有</button><button data-action="toggle-light">軽量モード ' + (state.light ? 'ON' : 'OFF') + '</button></div></section>' + testPanel());
   }
   function testPanel() {
     if (!testMode) return '';
@@ -116,7 +122,7 @@
   }
   function revealPack(cards) {
     state.opened=state.opened.concat(cards); state.packNo+=1;
-    var highest=cards.reduce(function(best,c){return rank(c.rarity)>rank(best)?c.rarity:best;},'N'); flash(highest);
+    var highest=cards.reduce(function(best,c){return rank(c.rarity)>rank(best)?c.rarity:best;},'N');track('vocalu_pack_open',{pack_number:state.packNo,highest_rarity:highest}); flash(highest);
     app.innerHTML=shell('<div class="section-head"><h2>開封結果</h2><span>PACK ' + state.packNo + ' / 5</span></div><div class="cards">' + cards.map(function(c,i){return cardHtml(c,state.opened.length-cards.length+i,false);}).join('') + '</div><div class="deck-footer"><button class="primary" data-action="next-pack">' + (state.packNo<5?'次のパック':'デッキを組む') + '</button></div>');
   }
   function rank(r) { return ['N','R','SR','UR'].indexOf(r); }
@@ -130,7 +136,7 @@
     app.innerHTML=shell('<section class="battle-setup"><div class="setup-deck"><span>YOUR DECK</span>' + cardFace(lead,false) + '<b>VOCALU DECK</b><small>' + deck.length + ' CARDS</small><button class="secondary" data-action="back-deck">デッキ変更</button></div><strong class="versus">VS</strong><div class="setup-deck opponent"><span>CPU DECK</span>' + cardFace(cpu[0],false) + '<b>STUDIO CPU</b><small>' + difficultyName() + '</small></div></section>' + difficulty + '<button class="primary setup-start" data-action="battle-start">BATTLE START</button>');
   }
   function difficultyName(){if(state.matchMode==='ranked')return 'RANKED · EXPERT';return state.difficulty==='expert'?'EXPERT':state.difficulty==='hard'?'HARD':'NORMAL';}
-  function startBattle() { var deck=state.selected.map(function(i){return state.opened[i];});state.battle=VocaluEngine.makeBattle(deck,makeCpuDeck());state.selectedUnit=null;state.targeting=null;state.pendingAttack=null;state.mulliganSelected=[];state.screen='opening';render(); }
+  function startBattle() { var deck=state.selected.map(function(i){return state.opened[i];});track('vocalu_battle_start',{mode:state.matchMode,difficulty:state.difficulty});state.battle=VocaluEngine.makeBattle(deck,makeCpuDeck());state.selectedUnit=null;state.targeting=null;state.pendingAttack=null;state.mulliganSelected=[];state.screen='opening';render(); }
   function startTestBattle() {
     var deck=VocaluCatalog.songs.slice(0,14).concat(VocaluCatalog.producers.slice(0,3),VocaluCatalog.singers.slice(0,3));
     state.battle=VocaluEngine.makeBattle(deck,makeCpuDeck(),function(){return .5;});
@@ -218,6 +224,7 @@
   function afterAction(){state.panelTab='log';if(state.battle.winner)finishBattle();else if(!showTriggerNotice(null))render();}
   function finishBattle(){
     saveCollection(state.opened);
+    track('vocalu_battle_complete',{mode:state.matchMode,difficulty:state.difficulty,result:state.battle.winner==='user'?'win':'loss',turns:state.battle.turn});
     if(state.matchMode==='ranked'&&!state.battle.rankSettled){
       var won=state.battle.winner==='user';
       state.battle.rankDelta=won?25:-20;
@@ -287,6 +294,7 @@
     else if(action==='home'){state.screen='home';render();}
     else if(action==='restart'||action==='rematch')beginMatch(state.matchMode);
     else if(action==='toggle-light'){state.light=!state.light;render();}
+    else if(action==='share-x'){track('vocalu_share',{method:'x',location:'lobby'});var shareText='ボカロ楽曲で20枚デッキを組んで遊べる「ボカる！」を公開しました。\n5パック開封→デッキ構築→CPU対戦までスマホで無料。\nあなたなら最初にどの曲を収録したい？\n\n#ボカロ #VOCALU';var shareUrl='https://anadayo.github.io/vocalu/?utm_source=x&utm_medium=social&utm_campaign=vocalu_launch';window.open('https://x.com/intent/post?text='+encodeURIComponent(shareText)+'&url='+encodeURIComponent(shareUrl),'_blank','noopener');}
     else if(action==='music')musicControls();
     else if(action==='music-prev'){if(yt&&state.music.ready)yt.previousVideo();}
     else if(action==='music-next'){if(yt&&state.music.ready)yt.nextVideo();}
