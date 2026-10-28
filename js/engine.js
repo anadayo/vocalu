@@ -77,7 +77,7 @@
       var lifeCards = deck.splice(0, 5);
       return { life: 5, lifeCards: lifeCards, deck: deck, hand: hand, field: [], discard: [], maxCost: 0, cost: 0, producerUsed: false, leader: null, leaderAwakened: false, leaderSkillUsed: false, goingSecond: goingSecond, firstTurnStarted: false };
     }
-    var state = { turn: 0, active: 'user', phase: 'main', winner: null, actionCount: 0, log: [], mulliganUsed: false, lastImpact: null, lastLifeTransfer: null };
+    var state = { turn: 0, active: 'user', phase: 'main', winner: null, actionCount: 0, log: [], mulliganUsed: false, lastImpact: null, lastLifeTransfer: null, lastMotion: null, lastLeaderSkill: null };
     state.user = player(deckCards, 3, false);
     state.cpu = player(cpuCards, 2, true);
     startTurn(state, 'user', false);
@@ -121,6 +121,7 @@
     p.field.forEach(function (song) { song.attacked = false; song.encoreUsed = false; });
     var drawCount = drawCard === false ? 0 : secondPlayerOpening ? 2 : 1;
     drawCards(p, drawCount);
+    state.lastMotion = { type: 'turn', side: side, drawCount: drawCount, turn: state.turn };
     if (secondPlayerOpening) state.log.unshift('後攻ボーナス · 葱COST +1');
     if (drawCount) state.log.unshift((secondPlayerOpening ? '後攻ボーナス · ' : '') + drawCount + '枚ドロー');
     p.firstTurnStarted = true;
@@ -148,10 +149,12 @@
         var mikuBonus = p.leaderAwakened ? LEADER_POWER.awakened : LEADER_POWER.normal;
         song.turnPowerBonus += mikuBonus;
         p.leaderSkillUsed = true;
+        state.lastLeaderSkill = { side: side, leader: 'miku', label: 'FIRST STAGE', amount: mikuBonus, awakened: p.leaderAwakened };
         state.log.unshift('初音ミク「FIRST STAGE」· POWER +' + mikuBonus + (p.leaderAwakened ? ' · AWAKEN' : ''));
       }
       if (p.field.length >= 3) p.discard.push(p.field.splice(replaceIndex, 1)[0]);
       p.field.push(song);
+      state.lastMotion = { type: 'summon', side: side, index: p.field.length - 1, cardId: song.id, rarity: song.rarity, cost: song.cost || 0 };
       if (hasAbility(song, 'draw_one') && p.deck.length) {
         p.hand.push(p.deck.shift());
         state.log.unshift(card.name + '「アンコール・ドロー」· 1枚ドロー');
@@ -194,6 +197,7 @@
         state.log.unshift(card.name + '「' + ability.label + '」· ' + ability.text);
       });
       state.lastSupport = supportEvent;
+      state.lastMotion = { type: 'support', side: side, cardId: card.id };
       p.discard.push(card);
       state.log.unshift(card.name + ' をサポートとして使用 · DROPへ');
     } else {
@@ -208,6 +212,7 @@
       }
       p.field[target].singer = card;
       p.field[target].currentPower += card.boost;
+      state.lastMotion = { type: 'equip', side: side, index: target, cardId: card.id };
       state.lastImpact = { type: 'tagteam', side: side, label: 'TAG TEAM · ' + card.name };
       state.log.unshift(card.name + ' を装備');
     }
@@ -236,9 +241,11 @@
       var tetoBonus = p.leaderAwakened ? LEADER_POWER.awakened : LEADER_POWER.normal;
       attacker.turnPowerBonus = (attacker.turnPowerBonus || 0) + tetoBonus;
       p.leaderSkillUsed = true;
+      state.lastLeaderSkill = { side: side, leader: 'teto', label: 'REPEAT BEAT', amount: tetoBonus, awakened: p.leaderAwakened };
       state.log.unshift('重音テト「REPEAT BEAT」· POWER +' + tetoBonus + (p.leaderAwakened ? ' · AWAKEN' : ''));
     }
     var attackPower = effectivePower(attacker);
+    state.lastMotion = { type: 'attack', side: side, attackerIndex: attackerIndex, targetType: targetType, targetIndex: targetIndex };
     attacker.attacked = true;
     state.phase = 'attack';
     if (targetType === 'song') {

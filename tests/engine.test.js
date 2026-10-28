@@ -360,6 +360,7 @@ E.playCard(drawBattle,'user',0,0);
 assert.equal(drawBattle.user.hand.length,1,'draw-one ability replaces the played card with one draw');
 assert.equal(drawBattle.user.deck.length,drawDeckBefore-1,'draw-one ability consumes the top deck card');
 assert.equal(drawBattle.lastImpact.type,'entry','high-cost songs expose the entry animation state');
+assert.equal(drawBattle.lastMotion.type,'summon','song play exposes a summon motion event');
 
 const readyBattle = E.makeBattle(strongDeck, weakDeck, () => 0.1);
 readyBattle.user.cost = 10;
@@ -374,5 +375,13 @@ E.attack(encoreBattle,'user',0,'song',0,null);
 assert.equal(encoreBattle.user.field[0].attacked,false,'encore song becomes active after a knockout');
 assert.equal(encoreBattle.user.field[0].encoreUsed,true,'encore is limited to once per turn');
 assert.equal(encoreBattle.lastImpact.type,'encore','encore exposes its special animation state');
+assert.equal(encoreBattle.lastMotion.type,'attack','attacks expose a directional motion event');
+
+const motionBattle = E.makeBattle(deck, deck, () => 0.1);
+assert.equal(motionBattle.lastMotion.type,'turn','turn start exposes a turn motion event');
+E.setLeaders(motionBattle,'miku','teto');
+motionBattle.user.cost = 10;
+E.playCard(motionBattle,'user',0,0);
+assert.equal(motionBattle.lastLeaderSkill.label,'FIRST STAGE','leader skill exposes a cut-in event');
 
 console.log('VOCALU engine tests: OK');

@@ -230,12 +230,13 @@
     var used=state.battle.mulliganUsed;
     app.innerHTML=shell('<section class="opening-hand"><span>OPENING HAND</span><h1>初期手札</h1><div class="opening-cards">' + cards + '</div><p>' + (used?'引き直し済みです。この手札で対戦を開始します。':'戻したいカードを好きな枚数選択できます。マリガンは1ゲームに1回だけです。') + '</p><div class="opening-actions">' + (!used?'<button class="secondary" data-action="mulligan" ' + (!state.mulliganSelected.length?'disabled':'') + '>' + state.mulliganSelected.length + '枚を引き直す</button>':'') + '<button class="primary" data-action="keep-hand">この手札で始める</button></div></section>');
   }
-  function slotHtml(song,index,side) {
+  function slotHtml(song,index,side,motion) {
     if(!song)return '<div class="battle-slot empty"><span>EMPTY</span></div>';
     var selected=state.selectedUnit&&state.selectedUnit.side===side&&state.selectedUnit.index===index;
     var target=side==='cpu'&&state.targeting!=null&&song.attacked;
     var incoming=state.pendingAttack&&((side==='cpu'&&state.pendingAttack.attackerIndex===index)||(side==='user'&&state.pendingAttack.targetType==='song'&&state.pendingAttack.targetIndex===index));
-    return '<div class="battle-slot ' + (selected?'selected ':'') + (target?'targetable ':'') + (incoming?(side==='cpu'?'attacking ':'under-attack '):'') + (song.attacked?'used':'') + '"><button class="slot-card" data-action="select-unit" data-side="' + side + '" data-index="' + index + '">' + cardFace(song,true) + '</button><button class="inspect" data-action="battle-detail" data-side="' + side + '" data-index="' + index + '" aria-label="詳細">⌕</button></div>';
+    var motionClass=motion&&motion.side===side&&motion.index===index?(motion.type==='summon'?'summon-motion ':motion.type==='equip'?'equip-motion ':''):'';
+    return '<div class="battle-slot ' + motionClass + (selected?'selected ':'') + (target?'targetable ':'') + (incoming?(side==='cpu'?'attacking ':'under-attack '):'') + (song.attacked?'used':'') + '"><button class="slot-card" data-action="select-unit" data-side="' + side + '" data-index="' + index + '">' + cardFace(song,true) + '</button><button class="inspect" data-action="battle-detail" data-side="' + side + '" data-index="' + index + '" aria-label="詳細">⌕</button></div>';
   }
   function lifeCards(player,side) { var cells='';for(var i=0;i<5;i+=1)cells+='<i class="life-cell ' + (i<player.life?'filled':'broken') + '"><span></span></i>';var incoming=side==='user'&&state.pendingAttack&&state.pendingAttack.targetType==='life';return '<button class="life-target digital-life-target ' + (side==='cpu'&&state.targeting!=null?'targetable ':'') + (incoming?'under-attack ':'') + '" ' + (side==='cpu'&&state.targeting!=null?'data-action="attack-life"':'disabled') + '><span class="life-readout"><small>LIFE</small><b>' + player.life + '</b><em>/5</em></span><span class="life-cells">' + cells + '</span></button>'; }
   function pileHtml(player,side){
@@ -276,21 +277,24 @@
   }
   function renderBattle() {
     var b=state.battle,u=b.user,c=b.cpu,userActive=b.active==='user';
-    var impact=b.lastImpact,leaderAwaken=b.lastLeaderAwaken,lifeTransfer=b.lastLifeTransfer;b.lastImpact=null;b.lastLeaderAwaken=null;b.lastLifeTransfer=null;
-    var cpuSlots=[0,1,2].map(function(i){return slotHtml(c.field[i],i,'cpu');}).join('');
-    var userSlots=[0,1,2].map(function(i){return slotHtml(u.field[i],i,'user');}).join('');
+    var impact=b.lastImpact,leaderAwaken=b.lastLeaderAwaken,lifeTransfer=b.lastLifeTransfer,motion=b.lastMotion,leaderSkill=b.lastLeaderSkill;b.lastImpact=null;b.lastLeaderAwaken=null;b.lastLifeTransfer=null;b.lastMotion=null;b.lastLeaderSkill=null;
+    var cpuSlots=[0,1,2].map(function(i){return slotHtml(c.field[i],i,'cpu',motion);}).join('');
+    var userSlots=[0,1,2].map(function(i){return slotHtml(u.field[i],i,'user',motion);}).join('');
     var hand=u.hand.map(function(card,i){return handHtml(card,i,u.hand.length,userActive,u.cost);}).join('');
     var targeting=state.targeting!=null?'<div class="target-guide">指・カーソルへ攻撃ラインが追従 · 対象をタップ<button data-action="cancel-action">取消</button></div><div class="attack-trail" data-attack-trail><i></i></div>':state.pendingAttack?'<div class="target-guide incoming-guide">CPUから攻撃中 · 点線の攻撃先を確認して防御を選択<span class="attack-arrow">↓</span></div><div class="attack-trail cpu-attack-trail" data-cpu-attack-trail><i></i></div>':'';
     var impactLabels={life:'LIFE BREAK',knockout:'KNOCKOUT',clash:'DOUBLE DROP',entry:'HIGH COST ENTRY',encore:'ENCORE ATTACK',tagteam:'TAG TEAM'};
     var impactHtml=impact?'<div class="impact-effect ' + impact.type + '"><b>' + esc(impact.label||impactLabels[impact.type]||'IMPACT') + '</b></div>':leaderAwaken?'<div class="impact-effect leader-awaken"><b>' + esc(leaderInfo(leaderAwaken.leader).name) + ' · AWAKEN</b></div>':'';
     var transferCard=lifeTransfer&&VocaluCatalog.cards.find(function(card){return card.id===lifeTransfer.cardId;});
     var transferHtml=lifeTransfer?'<div class="life-transfer ' + lifeTransfer.side + '"><div class="life-transfer-card"><span class="transfer-back">V</span><span class="transfer-front">' + (transferCard?artHtml(transferCard):'<b>VOCALU</b>') + '<small>' + esc(lifeTransfer.cardName||'LIFE CARD') + '</small></span></div><b>LIFE → HAND</b></div>':'';
+    var turnHtml=motion&&motion.type==='turn'?'<div class="turn-motion motion-overlay ' + motion.side + '"><small>TURN ' + motion.turn + '</small><b>' + (motion.side==='user'?'YOUR TURN':'CPU TURN') + '</b>' + (motion.drawCount?'<em>DRAW ' + motion.drawCount + '</em>':'') + '</div>':'';
+    var attackHtml=motion&&motion.type==='attack'?'<div class="attack-motion motion-overlay ' + motion.side + '"><i></i><i></i><i></i><b>ATTACK</b></div>':'';
+    var leaderSkillHtml=leaderSkill?'<div class="leader-skill-motion motion-overlay ' + leaderSkill.side + ' ' + (leaderSkill.awakened?'awakened':'') + '"><small>' + esc(leaderInfo(leaderSkill.leader).name) + '</small><b>' + esc(leaderSkill.label) + '</b><strong>POWER +' + leaderSkill.amount + '</strong></div>':'';
     var damageSide=impact&&impact.type==='life'?impact.side:null;
     var board='<section class="battle-center"><header class="battle-status"><span>TURN ' + b.turn + '</span><b class="' + (userActive?'user-turn':'cpu-turn') + '">' + (userActive?'YOUR TURN':'CPU TURN') + '</b><span>' + difficultyName() + '</span></header>' + targeting
       + '<div class="battle-zone player-row enemy mirrored">' + pileHtml(c,'cpu') + '<div class="battle-core">' + compactHand(c,'cpu') + '<div class="battle-field enemy-field">' + cpuSlots + '</div></div>' + lifeRail(c,'cpu',damageSide) + '</div>'
       + '<div class="stage-line"><span>VOCALU STAGE</span><button class="stage-end-turn" data-action="end-turn" ' + (userActive?'':'disabled') + '>ターン終了</button></div>'
       + '<div class="battle-zone player-row user">' + lifeRail(u,'user',damageSide) + '<div class="battle-core"><div class="battle-field user-field">' + userSlots + '</div></div>' + pileHtml(u,'user') + '</div>'
-      + (u.life<=2?'<div class="clutch-rule">LIFE 2 OR LESS · 召喚した楽曲はすぐ攻撃可能</div>':'') + '<div class="hand-zone"><div class="hand-label"><b>HAND</b><span>' + u.hand.length + ' CARDS</span></div><div class="hand">' + hand + '</div></div>' + transferHtml + impactHtml + '</section>';
+      + (u.life<=2?'<div class="clutch-rule">LIFE 2 OR LESS · 召喚した楽曲はすぐ攻撃可能</div>':'') + '<div class="hand-zone ' + (motion&&motion.type==='turn'&&motion.side==='user'&&motion.drawCount?'draw-motion':'') + '"><div class="hand-label"><b>HAND</b><span>' + u.hand.length + ' CARDS</span></div><div class="hand">' + hand + '</div></div>' + turnHtml + attackHtml + leaderSkillHtml + transferHtml + impactHtml + '</section>';
     app.innerHTML=shell(board+actionPanel(),true);
     if(state.targeting!=null)requestAnimationFrame(resetAttackTrail);
     if(state.pendingAttack)requestAnimationFrame(updateCpuAttackTrail);
