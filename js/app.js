@@ -8,6 +8,8 @@
   var MIGRATION = 'vocalu-migration-v3';
   var RANK_STORAGE = 'vocalu-rank-v1';
   var RANK_BOARD_STORAGE = 'vocalu-rank-board-v1';
+  var PLAYER_PROFILES_STORAGE = 'vocalu-player-profiles-v1';
+  var CURRENT_PLAYER_STORAGE = 'vocalu-current-player-v1';
   var state = {
     screen: 'home', opened: [], packNo: 0, selected: [], battle: null,
     selectedUnit: null, targeting: null, pendingAttack: null, panelTab: 'log', triggerResume: null, mulliganSelected: [],
@@ -23,15 +25,33 @@
     window.gtag('event', name, params || {});
   }
 
-  function loadRank() {
-    var saved = {};
-    try { saved = JSON.parse(localStorage.getItem(RANK_STORAGE) || '{}'); } catch (ignore) {}
+  function rankRecord(saved, fallbackName) {
+    saved = saved || {};
     return {
-      username: String(saved.username || '').trim().slice(0, 12),
+      username: String(saved.username || fallbackName || '').trim().slice(0, 12),
       rating: Math.max(0, Number(saved.rating) || 1000),
       wins: Math.max(0, Number(saved.wins) || 0),
       losses: Math.max(0, Number(saved.losses) || 0)
     };
+  }
+  function playerKey(name) { return String(name || '').trim().toLocaleLowerCase('ja-JP'); }
+  function loadPlayerProfiles() {
+    var profiles = {};
+    try { profiles = JSON.parse(localStorage.getItem(PLAYER_PROFILES_STORAGE) || '{}'); } catch (ignore) {}
+    return profiles && typeof profiles === 'object' && !Array.isArray(profiles) ? profiles : {};
+  }
+  function loadRank() {
+    var legacy = {}, profiles = loadPlayerProfiles(), current = '';
+    try { legacy = JSON.parse(localStorage.getItem(RANK_STORAGE) || '{}'); } catch (ignore) {}
+    try { current = localStorage.getItem(CURRENT_PLAYER_STORAGE) || ''; } catch (ignoreCurrent) {}
+    current = current || legacy.username || '';
+    var saved = profiles[playerKey(current)] || legacy;
+    var record = rankRecord(saved, current);
+    if (record.username && !profiles[playerKey(record.username)]) {
+      profiles[playerKey(record.username)] = record;
+      try { localStorage.setItem(PLAYER_PROFILES_STORAGE, JSON.stringify(profiles)); } catch (ignoreMigration) {}
+    }
+    return record;
   }
   function loadRankBoard() {
     var entries = [];
@@ -42,6 +62,10 @@
     try {
       localStorage.setItem(RANK_STORAGE, JSON.stringify(state.rank));
       if (!state.rank.username) return;
+      var profiles = loadPlayerProfiles();
+      profiles[playerKey(state.rank.username)] = rankRecord(state.rank);
+      localStorage.setItem(PLAYER_PROFILES_STORAGE, JSON.stringify(profiles));
+      localStorage.setItem(CURRENT_PLAYER_STORAGE, state.rank.username);
       var board = loadRankBoard().filter(function (entry) { return entry.username !== state.rank.username; });
       board.push({ username: state.rank.username, rating: state.rank.rating, wins: state.rank.wins, losses: state.rank.losses, updatedAt: Date.now() });
       board.sort(function (a, b) { return b.rating - a.rating || b.wins - a.wins; });
@@ -56,7 +80,15 @@
     var name = String(value || '').replace(/\s+/g, ' ').trim();
     if (!name || name.length > 12) throw new Error('ユーザーネームは1～12文字で入力してください');
     if (/[<>&"']/.test(name)) throw new Error('使用できない記号が含まれています');
-    state.rank.username = name;
+    var profiles = loadPlayerProfiles(), nextKey = playerKey(name), currentKey = playerKey(state.rank.username);
+    if (profiles[nextKey]) {
+      state.rank = rankRecord(profiles[nextKey], name);
+    } else {
+      if (currentKey && profiles[currentKey] && currentKey !== nextKey) delete profiles[currentKey];
+      state.rank = rankRecord({ username: name, rating: state.rank.rating, wins: state.rank.wins, losses: state.rank.losses });
+      profiles[nextKey] = state.rank;
+      try { localStorage.setItem(PLAYER_PROFILES_STORAGE, JSON.stringify(profiles)); } catch (ignore) {}
+    }
     saveRank();
   }
   function leaderboardHtml() {
@@ -69,7 +101,7 @@
   }
   function beginMatch(mode) {
     state.matchMode=mode;
-    state.difficulty=mode==='ranked'?'expert':'normal';
+    state.difficulty=mode==='ranked'?VocaluEngine.rankDifficulty(state.rank.rating):'normal';
     state.opened=[];state.packNo=0;state.selected=[];state.battle=null;state.pendingAttack=null;
     track('vocalu_mode_start',{mode:mode});
     state.screen='pack';render();
@@ -166,11 +198,11 @@
   function renderSetup() {
     var deck=state.selected.map(function(i){return state.opened[i];}); var lead=deck.find(function(c){return c.type==='song';})||deck[0]; var cpu=makeCpuDeck();
     var levels=[['normal','ノーマル','気軽に対戦'],['hard','ハード','強いカードを優先'],['expert','エキスパート','有利な交換を狙う']];
-    var difficulty=state.matchMode==='ranked'?'<section class="ranked-brief"><span>RANK MATCH</span><b>' + rankName(state.rank.rating) + ' · RATE ' + state.rank.rating + '</b><p>エキスパートCPU戦。勝利 +25 / 敗北 -20</p></section>':'<section class="difficulty-select"><span>CPU DIFFICULTY</span><div>' + levels.map(function(level){return '<button class="' + (state.difficulty===level[0]?'active':'') + '" data-action="difficulty" data-level="' + level[0] + '"><b>' + level[1] + '</b><small>' + level[2] + '</small></button>';}).join('') + '</div></section>';
+    var difficulty=state.matchMode==='ranked'?'<section class="ranked-brief"><span>RANK MATCH</span><b>' + rankName(state.rank.rating) + ' · RATE ' + state.rank.rating + '</b><p>CPU ' + difficultyName() + ' · 勝利 +25 / 敗北 -20</p><small>ランク上昇で判断が強化されます。手札・コスト・ライフの補正はありません。</small></section>':'<section class="difficulty-select"><span>CPU DIFFICULTY</span><div>' + levels.map(function(level){return '<button class="' + (state.difficulty===level[0]?'active':'') + '" data-action="difficulty" data-level="' + level[0] + '"><b>' + level[1] + '</b><small>' + level[2] + '</small></button>';}).join('') + '</div></section>';
     app.innerHTML=shell('<section class="battle-setup"><div class="setup-deck"><span>YOUR DECK</span>' + cardFace(lead,false) + '<b>VOCALU DECK</b><small>' + deck.length + ' CARDS</small><button class="secondary" data-action="back-deck">デッキ変更</button></div><strong class="versus">VS</strong><div class="setup-deck opponent"><span>CPU DECK</span>' + cardFace(cpu[0],false) + '<b>STUDIO CPU</b><small>' + difficultyName() + '</small></div></section>' + difficulty + '<button class="primary setup-start" data-action="battle-start">BATTLE START</button>');
   }
-  function difficultyName(){if(state.matchMode==='ranked')return 'RANKED · EXPERT';return state.difficulty==='expert'?'EXPERT':state.difficulty==='hard'?'HARD':'NORMAL';}
-  function startBattle() { var deck=state.selected.map(function(i){return state.opened[i];});track('vocalu_battle_start',{mode:state.matchMode,difficulty:state.difficulty});state.battle=VocaluEngine.makeBattle(deck,makeCpuDeck());state.selectedUnit=null;state.targeting=null;state.pendingAttack=null;state.mulliganSelected=[];state.screen='opening';render(); }
+  function difficultyName(){return state.difficulty==='expert'?'EXPERT':state.difficulty==='hard'?'HARD':'NORMAL';}
+  function startBattle() { var deck=state.selected.map(function(i){return state.opened[i];});if(state.matchMode==='ranked')state.difficulty=VocaluEngine.rankDifficulty(state.rank.rating);track('vocalu_battle_start',{mode:state.matchMode,difficulty:state.difficulty,rank:rankName(state.rank.rating)});state.battle=VocaluEngine.makeBattle(deck,makeCpuDeck());state.selectedUnit=null;state.targeting=null;state.pendingAttack=null;state.mulliganSelected=[];state.screen='opening';render(); }
   function startTestBattle() {
     var deck=VocaluCatalog.songs.slice(0,14).concat(VocaluCatalog.producers.slice(0,3),VocaluCatalog.singers.slice(0,3));
     state.battle=VocaluEngine.makeBattle(deck,makeCpuDeck(),function(){return .5;});
@@ -256,7 +288,24 @@
   function updateAttackTrail(clientX,clientY){var trail=document.querySelector('[data-attack-trail]'),source=document.querySelector('.user-field .battle-slot:nth-child(' + (Number(state.targeting)+1) + ')');positionAttackTrail(trail,source,clientX,clientY);}
   function updateCpuAttackTrail(){var pending=state.pendingAttack,trail=document.querySelector('[data-cpu-attack-trail]');if(!pending||!trail)return;var source=document.querySelector('.enemy-field .battle-slot:nth-child(' + (Number(pending.attackerIndex)+1) + ')');var target=pending.targetType==='song'?document.querySelector('.user-field .battle-slot:nth-child(' + (Number(pending.targetIndex)+1) + ')'):document.querySelector('.battle-zone.user .life-target');if(!source||!target)return;var targetRect=target.getBoundingClientRect();positionAttackTrail(trail,source,targetRect.left+targetRect.width/2,targetRect.top+targetRect.height/2);}
   function resetAttackTrail(){var field=document.querySelector('.enemy-field');if(!field)return;var rect=field.getBoundingClientRect();updateAttackTrail(rect.left+rect.width/2,rect.top+rect.height/2);}
-  function resolveUserAttack(targetType,targetIndex) { var attacker=state.targeting,enemy=state.battle.cpu,guard=null;state.targeting=null;if(targetType==='song'&&enemy.field[targetIndex]&&enemy.field[targetIndex].attacked)guard=enemy.field.findIndex(function(song,index){return index!==targetIndex&&!song.attacked;});else if(targetType==='life'&&enemy.life<=2){guard=enemy.field.findIndex(function(song){return !song.attacked;});if(guard<0)guard=enemy.field.findIndex(function(){return true;});}if(guard<0)guard=null;VocaluEngine.attack(state.battle,'user',attacker,targetType,targetIndex,guard);if(guard!=null)toast(targetType==='life'?'CPUの楽曲がライフをガード':'CPUのACTIVE楽曲がガード');state.selectedUnit=null;afterAction(); }
+  function chooseCpuGuard(targetType,targetIndex,attackerIndex) {
+    var cpu=state.battle.cpu,attacker=state.battle.user.field[attackerIndex],attackPower=VocaluEngine.effectivePower(attacker),difficulty=state.difficulty;
+    if(difficulty==='normal')return targetType==='life'&&cpu.life<=1?cpu.field.findIndex(function(){return true;}):null;
+    var active=cpu.field.map(function(card,index){return {card:card,index:index,power:VocaluEngine.effectivePower(card)};}).filter(function(item){return !item.card.attacked;});
+    if(targetType==='song'){
+      var target=cpu.field[targetIndex];
+      if(!target||!active.length)return null;
+      if(difficulty==='hard'&&VocaluEngine.effectivePower(target)<attackPower)return null;
+      active.sort(function(a,b){var aSurvives=a.power>=attackPower?0:1,bSurvives=b.power>=attackPower?0:1;return aSurvives-bSurvives||a.power-b.power;});
+      return active[0].index;
+    }
+    var lifeGuards=cpu.field.map(function(card,index){return {card:card,index:index,power:VocaluEngine.effectivePower(card)};});
+    if(cpu.life>2&&difficulty!=='expert')return null;
+    if(cpu.life>1&&difficulty==='expert'&&lifeGuards.every(function(item){return item.power<attackPower;}))return null;
+    lifeGuards.sort(function(a,b){var aSurvives=a.power>=attackPower?0:1,bSurvives=b.power>=attackPower?0:1;return aSurvives-bSurvives||a.power-b.power;});
+    return lifeGuards.length?lifeGuards[0].index:null;
+  }
+  function resolveUserAttack(targetType,targetIndex) { var attacker=state.targeting,guard=chooseCpuGuard(targetType,targetIndex,attacker);state.targeting=null;if(guard<0)guard=null;VocaluEngine.attack(state.battle,'user',attacker,targetType,targetIndex,guard);if(guard!=null)toast(targetType==='life'?'CPUの楽曲がライフをガード':'CPUのACTIVE楽曲がガード');state.selectedUnit=null;afterAction(); }
   function showTriggerNotice(resume) { var trigger=state.battle&&state.battle.lastTrigger;if(!trigger)return false;state.battle.lastTrigger=null;state.triggerResume=resume||null;render();var card=VocaluCatalog.cards.find(function(item){return item.id===trigger.cardId;});var modal=document.createElement('div');modal.className='modal trigger-modal';modal.innerHTML='<div class="dialog trigger-dialog"><span class="trigger-cut-in">TRIGGER</span><h2>' + esc(trigger.label) + '</h2>' + (card?'<div class="trigger-card">' + cardFace(card,false) + '</div>':'<b class="trigger-card-name">' + esc(trigger.cardName) + '</b>') + '<div class="trigger-effect"><span>' + esc((trigger.side==='user'?'あなた':'CPU')+'のLIFEから発動') + '</span><strong>' + esc(trigger.cardName) + '</strong><p>' + esc(trigger.text) + '</p></div><button class="primary" data-action="dismiss-trigger">効果を確認して続ける</button></div>';document.body.appendChild(modal);return true; }
   function afterAction(){state.panelTab='log';if(state.battle.winner)finishBattle();else if(!showTriggerNotice(null))render();}
   function finishBattle(){
@@ -341,7 +390,7 @@
     else if(action==='music-down'||action==='music-up'){state.music.volume=Math.max(0,Math.min(100,state.music.volume+(action==='music-up'?10:-10)));if(yt&&state.music.ready)yt.setVolume(state.music.volume);button.closest('.modal').remove();musicControls();}
     else if(action==='detail')cardDetail(button.dataset.card);
     else if(action==='force-rare'){var forced=VocaluCatalog.cards.find(function(c){return c.rarity===button.dataset.rare;});flash(button.dataset.rare);choose(button.dataset.rare+'演出確認',cardHtml(forced,-1,false));}
-    else if(action==='reset-save'){localStorage.removeItem(STORAGE);localStorage.removeItem(MIGRATION);localStorage.removeItem(RANK_STORAGE);localStorage.removeItem(RANK_BOARD_STORAGE);state.collection={};state.rank={username:'',rating:1000,wins:0,losses:0};render();}
+    else if(action==='reset-save'){localStorage.removeItem(STORAGE);localStorage.removeItem(MIGRATION);localStorage.removeItem(RANK_STORAGE);localStorage.removeItem(RANK_BOARD_STORAGE);localStorage.removeItem(PLAYER_PROFILES_STORAGE);localStorage.removeItem(CURRENT_PLAYER_STORAGE);state.collection={};state.rank={username:'',rating:1000,wins:0,losses:0};render();}
   }catch(err){toast(err.message||'操作を続けられませんでした');console.error(err);}});
   document.addEventListener('input',function(event){if(!event.target.matches('[data-volume]'))return;state.music.volume=Number(event.target.value);var label=event.target.closest('.dialog').querySelector('[data-volume-label]');if(label)label.textContent=state.music.volume;if(yt&&state.music.ready)yt.setVolume(state.music.volume);});
   var startY=0;app.addEventListener('touchstart',function(e){var p=e.target.closest('[data-action="open-pack"]');if(p&&e.touches[0])startY=e.touches[0].clientY;},{passive:true});app.addEventListener('touchend',function(e){var p=e.target.closest('[data-action="open-pack"]');if(p&&e.changedTouches[0]&&startY-e.changedTouches[0].clientY>35)p.click();},{passive:true});

@@ -336,6 +336,13 @@
     return Math.max(0, (card.currentPower || card.power || 0) + (card.turnPowerBonus || 0) - (card.attacked ? 1000 : 0));
   }
 
+  function rankDifficulty(rating) {
+    rating = Math.max(0, Number(rating) || 0);
+    if (rating >= 1300) return 'expert';
+    if (rating >= 1100) return 'hard';
+    return 'normal';
+  }
+
   function endTurn(state, side) {
     ensureTurn(state, side);
     if (state.winner) return state;
@@ -360,7 +367,18 @@
         if (difficulty === 'expert') return (b.card.type === 'song' ? 1 : 0) - (a.card.type === 'song' ? 1 : 0) || bv - av || (b.card.cost || 0) - (a.card.cost || 0);
         return bv - av;
       });
-      try { playCard(state, 'cpu', playable[0].index, state.cpu.field.length >= 3 ? 0 : 0); } catch (ignore) { break; }
+      var chosen = playable[0];
+      var replaceIndex = 0;
+      if (chosen.card.type === 'song' && state.cpu.field.length >= 3 && difficulty !== 'normal') {
+        replaceIndex = state.cpu.field.reduce(function (weakest, card, index, field) {
+          return effectivePower(card) < effectivePower(field[weakest]) ? index : weakest;
+        }, 0);
+      } else if (chosen.card.type === 'singer' && state.cpu.field.length && difficulty !== 'normal') {
+        replaceIndex = state.cpu.field.reduce(function (best, card, index, field) {
+          return effectivePower(card) > effectivePower(field[best]) ? index : best;
+        }, 0);
+      }
+      try { playCard(state, 'cpu', chosen.index, replaceIndex); } catch (ignore) { break; }
     }
     return state;
   }
@@ -398,5 +416,5 @@
     return true;
   }
 
-  return { RARITY_WEIGHTS: RARITY_WEIGHTS, openPack: openPack, openFivePacks: openFivePacks, autoBuild: autoBuild, makeBattle: makeBattle, mulligan: mulligan, playCard: playCard, attack: attack, endTurn: endTurn, cpuMainPhase: cpuMainPhase, cpuTurn: cpuTurn, effectivePower: effectivePower, validate: validate };
+  return { RARITY_WEIGHTS: RARITY_WEIGHTS, openPack: openPack, openFivePacks: openFivePacks, autoBuild: autoBuild, makeBattle: makeBattle, mulligan: mulligan, playCard: playCard, attack: attack, endTurn: endTurn, cpuMainPhase: cpuMainPhase, cpuTurn: cpuTurn, effectivePower: effectivePower, rankDifficulty: rankDifficulty, validate: validate };
 }));

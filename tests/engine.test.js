@@ -5,6 +5,10 @@ require('../js/song-media.js');
 require('../js/catalog.js');
 const E = require('../js/engine.js');
 
+assert.equal(E.rankDifficulty(1000), 'normal', 'bronze ranked CPU uses normal decisions');
+assert.equal(E.rankDifficulty(1100), 'hard', 'silver ranked CPU uses hard decisions');
+assert.equal(E.rankDifficulty(1300), 'expert', 'gold and higher ranked CPU uses expert decisions');
+
 function rngSequence(values) { let i=0; return () => values[(i++)%values.length]; }
 assert.equal(global.VocaluCatalog.cards.length, 300, 'catalog total');
 assert.equal(global.VocaluCatalog.songs.length, 240, 'songs total');
@@ -153,6 +157,21 @@ const lifeBeforeMain = cpuMain.user.life;
 E.cpuMainPhase(cpuMain);
 assert.equal(cpuMain.user.life,lifeBeforeMain,'CPU main phase does not resolve attacks before player choice');
 assert.equal(cpuMain.active,'cpu','CPU main phase waits for attack resolution');
+
+const rankedCpu = E.makeBattle(strongDeck, weakDeck, () => 0.1);
+rankedCpu.active = 'cpu';
+rankedCpu.cpu.cost = 1;
+rankedCpu.cpu.maxCost = 1;
+rankedCpu.cpu.field = [
+  {...weakDeck[0],currentPower:1000,attacked:false},
+  {...weakDeck[1],currentPower:5000,attacked:false},
+  {...weakDeck[2],currentPower:3000,attacked:false}
+];
+rankedCpu.cpu.hand = [{...strongDeck[0],cost:1,power:9000}];
+E.cpuMainPhase(rankedCpu,'expert');
+assert.equal(rankedCpu.cpu.field.some(card => card.currentPower === 1000),false,'expert CPU replaces its weakest field card');
+assert.equal(rankedCpu.cpu.cost,0,'ranked CPU pays the same card cost as the player');
+assert.equal(rankedCpu.cpu.hand.length,0,'ranked CPU receives no hidden bonus cards');
 
 const replacement = E.makeBattle(strongDeck, weakDeck, () => 0.1);
 replacement.user.cost = 10;

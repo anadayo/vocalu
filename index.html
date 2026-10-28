@@ -24,10 +24,11 @@
     gtag('js',new Date());
     window.VOCALU_ANALYTICS_ENABLED=location.hostname==='anadayo.github.io';
     gtag('config','G-1RKFX1HCCV',{send_page_view:window.VOCALU_ANALYTICS_ENABLED,content_group:'vocalu'});
+    if('serviceWorker' in navigator){navigator.serviceWorker.getRegistrations().then(function(registrations){registrations.forEach(function(registration){if(registration.scope.indexOf('/vocalu/')!==-1)registration.unregister();});});}
   </script>
   <link rel="manifest" href="manifest.webmanifest">
   <title>ボカる！ / VOCALU</title>
-  <link rel="stylesheet" href="styles.css?v=20261027-cpu-aim-1">
+  <link rel="stylesheet" href="styles.css?v=20261029-rank-profile-1">
 </head>
 <body>
   <div id="boot" class="boot" role="status"><b>VOCALU</b><span>ゲームを読み込んでいます</span></div>
@@ -38,9 +39,9 @@
   </div>
   <div id="app" hidden></div>
   <div id="yt-player" aria-hidden="true"></div>
-  <script src="js/song-media.js?v=20261027-cpu-aim-1" defer></script>
-  <script src="js/catalog.js?v=20261027-cpu-aim-1" defer></script>
-  <script src="js/engine.js?v=20261027-cpu-aim-1" defer></script>
-  <script src="js/app.js?v=20261027-cpu-aim-1" defer></script>
+  <script src="js/song-media.js?v=20261029-rank-profile-1" defer></script>
+  <script src="js/catalog.js?v=20261029-rank-profile-1" defer></script>
+  <script src="js/engine.js?v=20261029-rank-profile-1" defer></script>
+  <script src="js/app.js?v=20261029-rank-profile-1" defer></script>
 </body>
 </html>
