@@ -74,12 +74,18 @@
       var deck = clone(cards).sort(function () { return rng() - 0.5; });
       var hand = deck.splice(0, openingSize);
       var lifeCards = deck.splice(0, 5);
-      return { life: 5, lifeCards: lifeCards, deck: deck, hand: hand, field: [], discard: [], maxCost: 0, cost: 0, producerUsed: false, goingSecond: goingSecond, firstTurnStarted: false };
+      return { life: 5, lifeCards: lifeCards, deck: deck, hand: hand, field: [], discard: [], maxCost: 0, cost: 0, producerUsed: false, leader: null, leaderAwakened: false, leaderSkillUsed: false, goingSecond: goingSecond, firstTurnStarted: false };
     }
     var state = { turn: 0, active: 'user', phase: 'main', winner: null, actionCount: 0, log: [], mulliganUsed: false, lastImpact: null };
     state.user = player(deckCards, 3, false);
     state.cpu = player(cpuCards, 2, true);
     startTurn(state, 'user', false);
+    return state;
+  }
+
+  function setLeaders(state, userLeader, cpuLeader) {
+    state.user.leader = userLeader === 'teto' ? 'teto' : 'miku';
+    state.cpu.leader = cpuLeader === 'miku' ? 'miku' : 'teto';
     return state;
   }
 
@@ -110,6 +116,7 @@
     p.maxCost = Math.min(10, p.maxCost + 1 + (secondPlayerOpening ? 1 : 0));
     p.cost = p.maxCost;
     p.producerUsed = false;
+    p.leaderSkillUsed = false;
     p.field.forEach(function (song) { song.attacked = false; song.encoreUsed = false; });
     var drawCount = drawCard === false ? 0 : secondPlayerOpening ? 2 : 1;
     drawCards(p, drawCount);
@@ -136,6 +143,11 @@
       song.attacked = p.life > 2 && !hasAbility(song, 'ready_entry');
       song.encoreUsed = false;
       song.singer = null;
+      if (p.leader === 'miku' && !p.leaderSkillUsed) {
+        song.turnPowerBonus += p.leaderAwakened ? 1500 : 1000;
+        p.leaderSkillUsed = true;
+        state.log.unshift('初音ミク「FIRST STAGE」· POWER +' + (p.leaderAwakened ? 1500 : 1000));
+      }
       if (p.field.length >= 3) p.discard.push(p.field.splice(replaceIndex, 1)[0]);
       p.field.push(song);
       if (hasAbility(song, 'draw_one') && p.deck.length) {
@@ -218,7 +230,12 @@
       if (!attackTarget) throw new Error('攻撃対象が見つかりません');
       if (!attackTarget.attacked) throw new Error('ACTIVE状態の楽曲は攻撃対象にできません');
     }
-    var attackPower = attacker.currentPower;
+    if (p.leader === 'teto' && !p.leaderSkillUsed) {
+      attacker.turnPowerBonus = (attacker.turnPowerBonus || 0) + (p.leaderAwakened ? 2000 : 1000);
+      p.leaderSkillUsed = true;
+      state.log.unshift('重音テト「REPEAT BEAT」· POWER +' + (p.leaderAwakened ? 2000 : 1000));
+    }
+    var attackPower = effectivePower(attacker);
     attacker.attacked = true;
     state.phase = 'attack';
     if (targetType === 'song') {
@@ -259,6 +276,7 @@
         state.log.unshift(guard.name + ' でライフをガード' + (guard.attacked ? ' · REST補正 -1000' : '') + (attackPower === guardPower ? ' · 相打ち' : ''));
       } else {
         enemy.life -= 1;
+        awakenLeader(state, side === 'user' ? 'cpu' : 'user');
         state.lastImpact = { type: 'life', side: side === 'user' ? 'cpu' : 'user' };
         resolveLifeCard(state, side === 'user' ? 'cpu' : 'user', side);
         state.log.unshift(attacker.name + ' がライフへ攻撃');
@@ -275,7 +293,28 @@
     if (!defender.lifeCards || !defender.lifeCards.length) return null;
     var lifeCard = defender.lifeCards.pop();
     defender.hand.push(lifeCard);
-    if (defender.life <= 0 || lifeCard.type === 'song' || !lifeCard.trigger) return null;
+    if (defender.life <= 0 || !lifeCard.trigger) return null;
+
+    if (lifeCard.type === 'song') {
+      if (lifeCard.trigger.type !== 'conditional_play' || defender.life >= attacker.life) return null;
+      defender.hand.pop();
+      var song = clone(lifeCard);
+      song.currentPower = song.power;
+      song.turnPowerBonus = 0;
+      song.attacked = false;
+      song.encoreUsed = false;
+      song.singer = null;
+      if (defender.field.length >= 3) {
+        var weakest = defender.field.reduce(function (index, card, current, field) {
+          return effectivePower(card) < effectivePower(field[index]) ? current : index;
+        }, 0);
+        defender.discard.push(defender.field.splice(weakest, 1)[0]);
+      }
+      defender.field.push(song);
+      state.lastTrigger = { side: defendingSide, cardId: lifeCard.id, cardName: lifeCard.name, label: lifeCard.trigger.label, text: lifeCard.trigger.text, type: lifeCard.trigger.type };
+      state.log.unshift('TRIGGER · ' + lifeCard.name + ' がコストなしでACTIVE登場');
+      return state.lastTrigger;
+    }
 
     var effect = lifeCard.trigger.type;
     if (effect === 'destroy_one') {
@@ -301,6 +340,15 @@
     state.lastTrigger = { side: defendingSide, cardId: lifeCard.id, cardName: lifeCard.name, label: lifeCard.trigger.label, text: lifeCard.trigger.text, type: effect };
     state.log.unshift('TRIGGER · ' + lifeCard.name + '「' + lifeCard.trigger.label + '」');
     return state.lastTrigger;
+  }
+
+  function awakenLeader(state, side) {
+    var player = state[side];
+    if (!player || !player.leader || player.leaderAwakened || player.life > 2) return false;
+    player.leaderAwakened = true;
+    state.lastLeaderAwaken = { side: side, leader: player.leader };
+    state.log.unshift((player.leader === 'miku' ? '初音ミク' : '重音テト') + ' · AWAKEN');
+    return true;
   }
 
   function hasAbility(card, type) {
@@ -416,5 +464,5 @@
     return true;
   }
 
-  return { RARITY_WEIGHTS: RARITY_WEIGHTS, openPack: openPack, openFivePacks: openFivePacks, autoBuild: autoBuild, makeBattle: makeBattle, mulligan: mulligan, playCard: playCard, attack: attack, endTurn: endTurn, cpuMainPhase: cpuMainPhase, cpuTurn: cpuTurn, effectivePower: effectivePower, rankDifficulty: rankDifficulty, validate: validate };
+  return { RARITY_WEIGHTS: RARITY_WEIGHTS, openPack: openPack, openFivePacks: openFivePacks, autoBuild: autoBuild, makeBattle: makeBattle, setLeaders: setLeaders, mulligan: mulligan, playCard: playCard, attack: attack, endTurn: endTurn, cpuMainPhase: cpuMainPhase, cpuTurn: cpuTurn, effectivePower: effectivePower, rankDifficulty: rankDifficulty, validate: validate };
 }));

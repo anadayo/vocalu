@@ -10,10 +10,11 @@
   var RANK_BOARD_STORAGE = 'vocalu-rank-board-v1';
   var PLAYER_PROFILES_STORAGE = 'vocalu-player-profiles-v1';
   var CURRENT_PLAYER_STORAGE = 'vocalu-current-player-v1';
+  var LEADER_STORAGE = 'vocalu-leader-v1';
   var state = {
     screen: 'home', opened: [], packNo: 0, selected: [], battle: null,
     selectedUnit: null, targeting: null, pendingAttack: null, panelTab: 'log', triggerResume: null, mulliganSelected: [],
-    difficulty: 'normal', matchMode: 'free', rank: loadRank(),
+    difficulty: 'normal', matchMode: 'free', leaderChoice: loadLeaderChoice(), rank: loadRank(),
     collection: loadAndMigrate(), light: matchMedia('(prefers-reduced-motion: reduce)').matches,
     music: { ready: false, playing: false, volume: 40, title: 'BGM未再生' }
   };
@@ -23,6 +24,10 @@
   function track(name, params) {
     if (!window.VOCALU_ANALYTICS_ENABLED || typeof window.gtag !== 'function') return;
     window.gtag('event', name, params || {});
+  }
+
+  function loadLeaderChoice() {
+    try { return localStorage.getItem(LEADER_STORAGE) === 'teto' ? 'teto' : 'miku'; } catch (ignore) { return 'miku'; }
   }
 
   function rankRecord(saved, fallbackName) {
@@ -132,6 +137,11 @@
   }
   function esc(value) { return String(value == null ? '' : value).replace(/[&<>'"]/g, function (c) { return ({ '&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;' })[c]; }); }
   function typeName(type) { return type === 'song' ? '楽曲' : type === 'producer' ? 'ボカロP' : '歌い手'; }
+  function leaderInfo(id) {
+    var isTeto=id==='teto',name=isTeto?'重音テト':'初音ミク';
+    var card=VocaluCatalog.singers.find(function(item){return item.name===name;});
+    return { id:isTeto?'teto':'miku', name:name, image:card&&card.thumbnailUrl, skill:isTeto?'そのターン最初の攻撃をPOWER +1000。覚醒後は+2000。':'そのターン最初に登場する楽曲をPOWER +1000。覚醒後は+1500。' };
+  }
   function hueFor(value) { var total=0; String(value).split('').forEach(function(c){total=(total+c.charCodeAt(0)*17)%360;}); return total; }
   function artHtml(card) {
     if (card.thumbnailVerified && card.thumbnailUrl) return '<img src="' + esc(card.thumbnailUrl) + '" alt="' + esc(card.name) + '" loading="lazy">';
@@ -199,13 +209,15 @@
     var deck=state.selected.map(function(i){return state.opened[i];}); var lead=deck.find(function(c){return c.type==='song';})||deck[0]; var cpu=makeCpuDeck();
     var levels=[['normal','ノーマル','気軽に対戦'],['hard','ハード','強いカードを優先'],['expert','エキスパート','有利な交換を狙う']];
     var difficulty=state.matchMode==='ranked'?'<section class="ranked-brief"><span>RANK MATCH</span><b>' + rankName(state.rank.rating) + ' · RATE ' + state.rank.rating + '</b><p>CPU ' + difficultyName() + ' · 勝利 +25 / 敗北 -20</p><small>ランク上昇で判断が強化されます。手札・コスト・ライフの補正はありません。</small></section>':'<section class="difficulty-select"><span>CPU DIFFICULTY</span><div>' + levels.map(function(level){return '<button class="' + (state.difficulty===level[0]?'active':'') + '" data-action="difficulty" data-level="' + level[0] + '"><b>' + level[1] + '</b><small>' + level[2] + '</small></button>';}).join('') + '</div></section>';
-    app.innerHTML=shell('<section class="battle-setup"><div class="setup-deck"><span>YOUR DECK</span>' + cardFace(lead,false) + '<b>VOCALU DECK</b><small>' + deck.length + ' CARDS</small><button class="secondary" data-action="back-deck">デッキ変更</button></div><strong class="versus">VS</strong><div class="setup-deck opponent"><span>CPU DECK</span>' + cardFace(cpu[0],false) + '<b>STUDIO CPU</b><small>' + difficultyName() + '</small></div></section>' + difficulty + '<button class="primary setup-start" data-action="battle-start">BATTLE START</button>');
+    var leaders=['miku','teto'].map(function(id){var leader=leaderInfo(id);return '<button class="leader-choice ' + (state.leaderChoice===id?'active':'') + '" data-action="choose-leader" data-leader="' + id + '">' + (leader.image?'<img src="' + esc(leader.image) + '" alt="' + esc(leader.name) + '">':'') + '<span><b>' + esc(leader.name) + '</b><small>' + esc(leader.skill) + '</small></span></button>';}).join('');
+    app.innerHTML=shell('<section class="battle-setup"><div class="setup-deck"><span>YOUR DECK</span>' + cardFace(lead,false) + '<b>VOCALU DECK</b><small>' + deck.length + ' CARDS</small><button class="secondary" data-action="back-deck">デッキ変更</button></div><strong class="versus">VS</strong><div class="setup-deck opponent"><span>CPU DECK</span>' + cardFace(cpu[0],false) + '<b>STUDIO CPU</b><small>' + difficultyName() + '</small></div></section><section class="leader-select"><span>SELECT LEADER</span><div>' + leaders + '</div><p>LIFE 2以下で覚醒。回復しても覚醒状態は維持されます。</p></section>' + difficulty + '<button class="primary setup-start" data-action="battle-start">BATTLE START</button>');
   }
   function difficultyName(){return state.difficulty==='expert'?'EXPERT':state.difficulty==='hard'?'HARD':'NORMAL';}
-  function startBattle() { var deck=state.selected.map(function(i){return state.opened[i];});if(state.matchMode==='ranked')state.difficulty=VocaluEngine.rankDifficulty(state.rank.rating);track('vocalu_battle_start',{mode:state.matchMode,difficulty:state.difficulty,rank:rankName(state.rank.rating)});state.battle=VocaluEngine.makeBattle(deck,makeCpuDeck());state.selectedUnit=null;state.targeting=null;state.pendingAttack=null;state.mulliganSelected=[];state.screen='opening';render(); }
+  function startBattle() { var deck=state.selected.map(function(i){return state.opened[i];});if(state.matchMode==='ranked')state.difficulty=VocaluEngine.rankDifficulty(state.rank.rating);track('vocalu_battle_start',{mode:state.matchMode,difficulty:state.difficulty,rank:rankName(state.rank.rating),leader:state.leaderChoice});state.battle=VocaluEngine.makeBattle(deck,makeCpuDeck());VocaluEngine.setLeaders(state.battle,state.leaderChoice,state.leaderChoice==='miku'?'teto':'miku');state.selectedUnit=null;state.targeting=null;state.pendingAttack=null;state.mulliganSelected=[];state.screen='opening';render(); }
   function startTestBattle() {
     var deck=VocaluCatalog.songs.slice(0,14).concat(VocaluCatalog.producers.slice(0,3),VocaluCatalog.singers.slice(0,3));
     state.battle=VocaluEngine.makeBattle(deck,makeCpuDeck(),function(){return .5;});
+    VocaluEngine.setLeaders(state.battle,state.leaderChoice,state.leaderChoice==='miku'?'teto':'miku');
     state.battle.user.cost=10; state.battle.user.maxCost=10; state.battle.user.life=2;
     var highCost=VocaluCatalog.songs.find(function(card){return card.cost>=6&&card.abilities&&card.abilities.length;});
     state.battle.user.hand=[VocaluCatalog.songs[0],highCost,VocaluCatalog.singers.find(function(card){return card.trigger;}),VocaluCatalog.producers.find(function(card){return card.trigger;})];
@@ -241,8 +253,8 @@
     return '<div class="player-strip ' + side + '"><div class="player-meta"><b>' + name + '</b><small>' + label + '</small></div>' + leekMeter(player) + compactHand(player,side) + '</div>';
   }
   function lifeRail(player,side){
-    var name=side==='cpu'?'CPU':'YOU';
-    return '<div class="life-rail ' + side + '"><div class="rail-player"><b>' + name + '</b><span><i class="mini-leek"></i>' + player.cost + '/' + player.maxCost + '</span></div>' + lifeCards(player,side) + '</div>';
+    var name=side==='cpu'?'CPU':'YOU',leader=leaderInfo(player.leader),awake=player.leaderAwakened;
+    return '<div class="life-rail ' + side + '"><div class="rail-player"><b>' + name + '</b><small class="rail-leader ' + (awake?'awakened':'') + '">' + esc(leader.name) + (awake?' · AWAKEN':'') + '</small><span><i class="mini-leek"></i>' + player.cost + '/' + player.maxCost + '</span></div>' + lifeCards(player,side) + '</div>';
   }
   function handHtml(card,i,total,userActive,cost) {
     var offset=i-(total-1)/2,angle=Math.max(-9,Math.min(9,offset*3)),lift=Math.min(14,Math.abs(offset)*4),unavailable=!userActive||(card.cost||0)>cost;
@@ -264,13 +276,13 @@
   }
   function renderBattle() {
     var b=state.battle,u=b.user,c=b.cpu,userActive=b.active==='user';
-    var impact=b.lastImpact;b.lastImpact=null;
+    var impact=b.lastImpact,leaderAwaken=b.lastLeaderAwaken;b.lastImpact=null;b.lastLeaderAwaken=null;
     var cpuSlots=[0,1,2].map(function(i){return slotHtml(c.field[i],i,'cpu');}).join('');
     var userSlots=[0,1,2].map(function(i){return slotHtml(u.field[i],i,'user');}).join('');
     var hand=u.hand.map(function(card,i){return handHtml(card,i,u.hand.length,userActive,u.cost);}).join('');
     var targeting=state.targeting!=null?'<div class="target-guide">指・カーソルへ攻撃ラインが追従 · 対象をタップ<button data-action="cancel-action">取消</button></div><div class="attack-trail" data-attack-trail><i></i></div>':state.pendingAttack?'<div class="target-guide incoming-guide">CPUから攻撃中 · 点線の攻撃先を確認して防御を選択<span class="attack-arrow">↓</span></div><div class="attack-trail cpu-attack-trail" data-cpu-attack-trail><i></i></div>':'';
     var impactLabels={life:'LIFE BREAK',knockout:'KNOCKOUT',clash:'DOUBLE DROP',entry:'HIGH COST ENTRY',encore:'ENCORE ATTACK',tagteam:'TAG TEAM'};
-    var impactHtml=impact?'<div class="impact-effect ' + impact.type + '"><b>' + esc(impact.label||impactLabels[impact.type]||'IMPACT') + '</b></div>':'';
+    var impactHtml=impact?'<div class="impact-effect ' + impact.type + '"><b>' + esc(impact.label||impactLabels[impact.type]||'IMPACT') + '</b></div>':leaderAwaken?'<div class="impact-effect leader-awaken"><b>' + esc(leaderInfo(leaderAwaken.leader).name) + ' · AWAKEN</b></div>':'';
     var board='<section class="battle-center"><header class="battle-status"><span>TURN ' + b.turn + '</span><b class="' + (userActive?'user-turn':'cpu-turn') + '">' + (userActive?'YOUR TURN':'CPU TURN') + '</b><span>' + difficultyName() + '</span></header>' + targeting
       + '<div class="battle-zone player-row enemy mirrored">' + pileHtml(c,'cpu') + '<div class="battle-core">' + compactHand(c,'cpu') + '<div class="battle-field enemy-field">' + cpuSlots + '</div></div>' + lifeRail(c,'cpu') + '</div>'
       + '<div class="stage-line"><span>VOCALU STAGE</span><button class="stage-end-turn" data-action="end-turn" ' + (userActive?'':'disabled') + '>ターン終了</button></div>'
@@ -331,7 +343,7 @@
   function initMusic(){if(yt&&state.music.ready){state.music.playing?yt.pauseVideo():yt.playVideo();return;}state.music.title='YouTubeを接続中';render();window.onYouTubeIframeAPIReady=function(){try{yt=new YT.Player('yt-player',{height:'1',width:'1',playerVars:{listType:'playlist',list:'PL4hnIvXd3nC4mvwumy4IFfY4d8vVmcVGA',playsinline:1,controls:0},events:{onReady:function(e){state.music.ready=true;e.target.setVolume(state.music.volume);e.target.playVideo();},onStateChange:function(e){state.music.playing=e.data===1;try{state.music.title=e.target.getVideoData().title||'VOCALU BGM';}catch(ignore){}render();},onError:function(){toast('BGMを読み込めませんでした。');}}});}catch(err){toast('BGMの初期化に失敗しました。');}};if(!document.getElementById('youtube-api')){var s=document.createElement('script');s.id='youtube-api';s.src='https://www.youtube.com/iframe_api';document.head.appendChild(s);}}
   function musicControls(){if(!state.music.ready)initMusic();choose('BGM','<p>' + esc(state.music.title) + '</p><button class="secondary" data-action="music-prev">前の曲</button><button class="secondary" data-action="music-toggle">再生 / 停止</button><button class="secondary" data-action="music-next">次の曲</button><button class="secondary" data-action="music-down">音量 -</button><button class="secondary" data-action="music-up">音量 +</button><p>音量 ' + state.music.volume + '</p>');}
   function battleSettings(){choose('対戦設定','<div class="settings-group"><span>BGM</span><b>' + esc(state.music.title) + '</b><button class="secondary" data-action="music-toggle">' + (state.music.playing?'一時停止':'BGMを再生') + '</button></div><label class="settings-volume"><span>BGM音量</span><b data-volume-label>' + state.music.volume + '</b><input type="range" min="0" max="100" step="5" value="' + state.music.volume + '" data-volume></label><button class="secondary" data-action="battle-toggle-light">軽量モード ' + (state.light?'ON':'OFF') + '</button><button class="danger-button" data-action="retire-confirm">対戦をリタイア</button>');}
-  function battleGuide(){choose('遊び方・キーワード','<div class="rule-guide"><section><h3>勝利条件</h3><p>相手のLIFEを0にすると勝利。毎ターン使える葱COSTが1増え、最大10になります。後攻は最初のターンだけ2枚引き、手札4枚・葱COST 2で行動を始めます。</p></section><section><h3>ACTIVE / REST</h3><p>ACTIVEは攻撃とガードが可能で、直接攻撃されません。攻撃後はRESTになり、攻撃対象になります。REST中はPOWER -1000。同じPOWERなら双方がDROPへ行く相打ちです。</p></section><section><h3>GUARD</h3><p>ACTIVE楽曲は、味方のREST楽曲をガードできます。LIFEへの攻撃はACTIVE・RESTどちらでもガードできます。</p></section><section><h3>SUPPORT / TAG TEAM</h3><p>ボカロPは0コストで使える、1ターン1枚の使い切りサポート。山札確認・ドロー・楽曲強化などでライブを支えます。歌い手は楽曲へ装備し、TAG TEAMとしてPOWERを強化します。</p></section><section><h3>TRIGGER</h3><p>LIFEから手札へ加わったサポートがTRIGGERを持つ場合、逆転効果がその場で発動します。</p></section></div>');}
+  function battleGuide(){choose('遊び方・キーワード','<div class="rule-guide"><section><h3>勝利条件</h3><p>相手のLIFEを0にすると勝利。毎ターン使える葱COSTが1増え、最大10になります。後攻は最初のターンだけ2枚引き、手札4枚・葱COST 2で行動を始めます。</p></section><section><h3>LEADER / AWAKEN</h3><p>リーダーはデッキ外から固有スキルを使います。LIFE 2以下で覚醒し、その後LIFEを回復しても覚醒は解除されません。</p></section><section><h3>ACTIVE / REST</h3><p>ACTIVEは攻撃とガードが可能で、直接攻撃されません。攻撃後はRESTになり、攻撃対象になります。REST中はPOWER -1000。同じPOWERなら双方がDROPへ行く相打ちです。</p></section><section><h3>GUARD</h3><p>ACTIVE楽曲は、味方のREST楽曲をガードできます。LIFEへの攻撃はACTIVE・RESTどちらでもガードできます。</p></section><section><h3>SUPPORT / TAG TEAM</h3><p>ボカロPは0コストで使える、1ターン1枚の使い切りサポート。山札確認・ドロー・楽曲強化などでライブを支えます。歌い手は楽曲へ装備し、TAG TEAMとしてPOWERを強化します。</p></section><section><h3>TRIGGER</h3><p>LIFEから加わったカードがTRIGGERを持つと逆転効果が発動します。高コスト楽曲はLIFE差の条件を満たすと無料でACTIVE登場します。</p></section></div>');}
   function logStyle(entry){if(/のターン/.test(entry))return ['turn','↻','TURN'];if(/TRIGGER/.test(entry))return ['trigger','✦','TRIGGER'];if(/攻撃|ガード/.test(entry))return ['attack','⚔','BATTLE'];if(/召喚|装備|サポート/.test(entry))return ['play','＋','PLAY'];if(/ドロー|POWER/.test(entry))return ['effect','◆','EFFECT'];return ['system','•','SYSTEM'];}
   function battleLog(){var b=state.battle;var summary='<div class="log-summary"><div><span>TURN</span><b>'+b.turn+'</b></div><div><span>YOU</span><b>LIFE '+b.user.life+'</b></div><div><span>CPU</span><b>LIFE '+b.cpu.life+'</b></div></div>';var entries=b.log.slice(0,40).map(function(entry,index){var meta=logStyle(entry);return '<div class="log-entry '+meta[0]+'"><i>'+meta[1]+'</i><div><span>'+meta[2]+(index===0?' · LATEST':'')+'</span><p>'+esc(entry)+'</p></div></div>';}).join('');choose('BATTLE HISTORY',summary+'<div class="battle-log modal-log">'+entries+'</div>');}
   function runCpuTurn(){VocaluEngine.endTurn(state.battle,'user');VocaluEngine.cpuMainPhase(state.battle,state.difficulty);state.selectedUnit=null;state.pendingAttack=null;state.panelTab='log';render();setTimeout(runNextCpuAttack,state.light?20:280);}
@@ -350,6 +362,7 @@
     else if(action==='auto-deck'){state.selected=VocaluEngine.autoBuild(state.opened);render();}
     else if(action==='battle-setup'){state.screen='setup';render();}
     else if(action==='difficulty'){state.difficulty=button.dataset.level;render();}
+    else if(action==='choose-leader'){state.leaderChoice=button.dataset.leader==='teto'?'teto':'miku';try{localStorage.setItem(LEADER_STORAGE,state.leaderChoice);}catch(ignoreLeader){}render();}
     else if(action==='test-battle'&&testMode)startTestBattle();
     else if(action==='back-deck'){state.screen='deck';render();}
     else if(action==='battle-start')startBattle();
@@ -390,7 +403,7 @@
     else if(action==='music-down'||action==='music-up'){state.music.volume=Math.max(0,Math.min(100,state.music.volume+(action==='music-up'?10:-10)));if(yt&&state.music.ready)yt.setVolume(state.music.volume);button.closest('.modal').remove();musicControls();}
     else if(action==='detail')cardDetail(button.dataset.card);
     else if(action==='force-rare'){var forced=VocaluCatalog.cards.find(function(c){return c.rarity===button.dataset.rare;});flash(button.dataset.rare);choose(button.dataset.rare+'演出確認',cardHtml(forced,-1,false));}
-    else if(action==='reset-save'){localStorage.removeItem(STORAGE);localStorage.removeItem(MIGRATION);localStorage.removeItem(RANK_STORAGE);localStorage.removeItem(RANK_BOARD_STORAGE);localStorage.removeItem(PLAYER_PROFILES_STORAGE);localStorage.removeItem(CURRENT_PLAYER_STORAGE);state.collection={};state.rank={username:'',rating:1000,wins:0,losses:0};render();}
+    else if(action==='reset-save'){localStorage.removeItem(STORAGE);localStorage.removeItem(MIGRATION);localStorage.removeItem(RANK_STORAGE);localStorage.removeItem(RANK_BOARD_STORAGE);localStorage.removeItem(PLAYER_PROFILES_STORAGE);localStorage.removeItem(CURRENT_PLAYER_STORAGE);localStorage.removeItem(LEADER_STORAGE);state.collection={};state.rank={username:'',rating:1000,wins:0,losses:0};state.leaderChoice='miku';render();}
   }catch(err){toast(err.message||'操作を続けられませんでした');console.error(err);}});
   document.addEventListener('input',function(event){if(!event.target.matches('[data-volume]'))return;state.music.volume=Number(event.target.value);var label=event.target.closest('.dialog').querySelector('[data-volume-label]');if(label)label.textContent=state.music.volume;if(yt&&state.music.ready)yt.setVolume(state.music.volume);});
   var startY=0;app.addEventListener('touchstart',function(e){var p=e.target.closest('[data-action="open-pack"]');if(p&&e.touches[0])startY=e.touches[0].clientY;},{passive:true});app.addEventListener('touchend',function(e){var p=e.target.closest('[data-action="open-pack"]');if(p&&e.changedTouches[0]&&startY-e.changedTouches[0].clientY>35)p.click();},{passive:true});

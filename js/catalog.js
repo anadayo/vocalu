@@ -143,6 +143,9 @@
     if (cost >= 7 && !abilities.some(function (ability) { return ability.type === 'ready_entry'; })) abilities.push(songAbilityPool[1]);
     return abilities;
   }
+  function triggerForSong(cost) {
+    return cost >= 6 ? { type:'conditional_play', label:'逆転ライブ', text:'LIFEから加わる時、自分のLIFEが相手より少なければ、コストを払わずACTIVEで登場する。' } : null;
+  }
   function producerCost() {
     return 0;
   }
@@ -177,6 +180,7 @@
         power: basePower,
         cost: cost,
         abilities: abilitiesForSong(index, cost),
+        trigger: triggerForSong(cost),
         viewCount: null,
         viewCountVerifiedAt: null,
         videoUrl: videoId ? 'https://www.youtube.com/watch?v=' + videoId : artwork ? artwork.url : syncedMedia ? syncedMedia.mediaUrl : null,

@@ -24,9 +24,10 @@ assert.equal(global.VocaluCatalog.singers.filter(c => c.trigger && c.trigger.typ
 assert.equal(global.VocaluCatalog.producers.filter(c => c.abilities && c.abilities.length).length, 20, 'all producers have support effects');
 assert.ok(global.VocaluCatalog.producers.some(c => c.abilities.length > 1), 'some producers have multi-line support effects');
 assert.equal(global.VocaluCatalog.producers.every(c => c.cost === 0), true, 'all producer cards cost zero');
-assert.deepEqual([...new Set(global.VocaluCatalog.cards.filter(c => c.trigger).map(c => c.trigger.type))].sort(), ['bounce','destroy_one','discard_one','heal_one','stop_attacks'].sort(), 'support trigger pool includes reversal effects');
+assert.deepEqual([...new Set(global.VocaluCatalog.cards.filter(c => c.type !== 'song' && c.trigger).map(c => c.trigger.type))].sort(), ['bounce','destroy_one','discard_one','heal_one','stop_attacks'].sort(), 'support trigger pool includes reversal effects');
 assert.ok(global.VocaluCatalog.songs.filter(c => c.cost === 1).every(c => c.abilities.some(a => a.type === 'draw_one')), 'every one-cost song draws one card on entry');
 assert.ok(global.VocaluCatalog.songs.filter(c => c.cost >= 6).every(c => c.abilities && c.abilities.length), 'all high-cost songs have an ability');
+assert.ok(global.VocaluCatalog.songs.filter(c => c.cost >= 6).every(c => c.trigger && c.trigger.type === 'conditional_play'), 'all high-cost songs have a comeback life trigger');
 assert.ok(global.VocaluCatalog.songs.filter(c => c.cost > 1 && c.cost < 6).every(c => !c.abilities.length), 'mid-cost songs do not receive high-cost abilities');
 assert.deepEqual(global.VocaluCatalog.songs.reduce((a,c)=>(a[c.rarity]=(a[c.rarity]||0)+1,a),{}), {N:100,R:80,SR:45,UR:15});
 assert.deepEqual(global.VocaluCatalog.producers.reduce((a,c)=>(a[c.rarity]=(a[c.rarity]||0)+1,a),{}), {N:4,R:6,SR:6,UR:4});
@@ -51,6 +52,9 @@ assert.equal(new Set(deckIndexes).size, 20, 'auto deck uses unique opened slots'
 
 const deck = global.VocaluCatalog.songs.slice(0,20).map(c => ({...c,cost:1,power:3000,abilities:[]}));
 const battle = E.makeBattle(deck, deck, () => 0.2);
+E.setLeaders(battle,'miku','teto');
+assert.equal(battle.user.leader,'miku','user leader is assigned outside the deck');
+assert.equal(battle.cpu.leader,'teto','CPU receives the other leader under the same rules');
 assert.equal(battle.user.life,5);
 assert.equal(battle.user.hand.length,3,'opening hand has three cards');
 assert.equal(battle.cpu.hand.length,2,'second player waits with two cards before the opening turn');
@@ -75,6 +79,8 @@ assert.equal(mulliganBattle.mulliganUsed,true,'mulligan is marked as used');
 assert.throws(()=>E.mulligan(mulliganBattle,[0],() => 0.2),/1ゲームに1回/,'mulligan cannot be used twice');
 E.playCard(battle,'user',0,0);
 assert.equal(battle.user.field.length,1);
+assert.equal(battle.user.field[0].turnPowerBonus,1000,'Miku strengthens the first song played each turn');
+assert.equal(battle.user.leaderSkillUsed,true,'Miku leader skill is limited to once per turn');
 E.endTurn(battle,'user');
 E.cpuTurn(battle,()=>0.2,null);
 assert.equal(battle.active,'user','CPU turn returns control');
@@ -276,6 +282,36 @@ assert.equal(destroyTrigger.user.field.some(c => c.currentPower === 9000),false,
 const healTrigger = makeTriggerBattle('heal_one');
 assert.equal(healTrigger.cpu.life,2,'heal trigger restores one life after damage');
 assert.equal(healTrigger.cpu.lifeCards.length,1,'heal trigger places a deck card into life');
+
+const awakenBattle = E.makeBattle(strongDeck, weakDeck, () => 0.1);
+E.setLeaders(awakenBattle,'teto','miku');
+awakenBattle.cpu.life = 3;
+awakenBattle.cpu.lifeCards = [{...global.VocaluCatalog.cards.find(c => c.type !== 'song' && c.trigger && c.trigger.type === 'heal_one')}];
+awakenBattle.user.field = [{...strongDeck[0],currentPower:9000,turnPowerBonus:0,attacked:false}];
+E.attack(awakenBattle,'user',0,'life',null,null);
+assert.equal(awakenBattle.cpu.leaderAwakened,true,'leader awakens when life reaches two');
+assert.equal(awakenBattle.cpu.life,3,'heal trigger can raise life after awakening');
+assert.equal(awakenBattle.cpu.leaderAwakened,true,'awakening stays active after life recovery');
+
+const tetoBattle = E.makeBattle(strongDeck, weakDeck, () => 0.1);
+E.setLeaders(tetoBattle,'teto','miku');
+tetoBattle.user.field = [{...strongDeck[0],currentPower:3000,turnPowerBonus:0,attacked:false}];
+E.attack(tetoBattle,'user',0,'life',null,null);
+assert.equal(tetoBattle.user.field[0].turnPowerBonus,1000,'Teto strengthens the first attack each turn');
+assert.equal(tetoBattle.user.leaderSkillUsed,true,'Teto leader skill is limited to once per turn');
+
+const songTriggerBattle = E.makeBattle(strongDeck, weakDeck, () => 0.1);
+const triggerSong = global.VocaluCatalog.songs.find(c => c.cost >= 6 && c.trigger && c.trigger.type === 'conditional_play');
+songTriggerBattle.user.life = 3;
+songTriggerBattle.user.lifeCards = [{...triggerSong}];
+songTriggerBattle.cpu.life = 5;
+songTriggerBattle.cpu.field = [{...weakDeck[0],currentPower:1000,attacked:false}];
+songTriggerBattle.active = 'cpu';
+E.attack(songTriggerBattle,'cpu',0,'life',null,null);
+assert.equal(songTriggerBattle.user.life,2,'high-cost trigger test takes one life damage');
+assert.equal(songTriggerBattle.user.field.some(card => card.id === triggerSong.id),true,'high-cost life trigger plays the song for free while behind');
+assert.equal(songTriggerBattle.user.field.find(card => card.id === triggerSong.id).attacked,false,'triggered high-cost song enters active');
+assert.equal(songTriggerBattle.user.hand.some(card => card.id === triggerSong.id),false,'successfully triggered song leaves the hand for the field');
 
 const discardState = E.makeBattle(strongDeck, weakDeck, () => 0.1);
 const attackerHandBefore = discardState.user.hand.length;
