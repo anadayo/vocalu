@@ -196,7 +196,9 @@
   });
   var singers = singerNames.map(function (name, index) {
     var profile = singerProfiles[name];
-    return { id: 'singer-' + String(index + 1).padStart(2, '0'), type: 'singer', name: name, rarity: rarityByQuota(index, [16, 12, 8, 4]), cost: 1 + index % 3, boost: 500 + index % 5 * 500, profile: '楽曲に装備し、歌声の個性でパワーを加えるサポートカード。', trigger: triggerFor(index, 2), thumbnailUrl: profile.image, thumbnailVerified: true, profileUrl: profile.source, mediaSource: profile.label, mediaVerifiedAt: '2026-10-17' };
+    var rarity = rarityByQuota(index, [16, 12, 8, 4]);
+    var singerStats = { N:{ cost:1, boost:1000 }, R:{ cost:1, boost:1500 }, SR:{ cost:2, boost:2500 }, UR:{ cost:3, boost:4000 } }[rarity];
+    return { id: 'singer-' + String(index + 1).padStart(2, '0'), type: 'singer', name: name, rarity: rarity, cost: singerStats.cost, boost: singerStats.boost, profile: '楽曲に装備し、歌声の個性でパワーを加えるサポートカード。', trigger: triggerFor(index, 2), thumbnailUrl: profile.image, thumbnailVerified: true, profileUrl: profile.source, mediaSource: profile.label, mediaVerifiedAt: '2026-10-17' };
   });
 
   var catalog = songs.concat(producers, singers);

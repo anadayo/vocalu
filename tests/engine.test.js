@@ -31,6 +31,10 @@ assert.ok(global.VocaluCatalog.songs.filter(c => c.cost > 1 && c.cost < 6).every
 assert.deepEqual(global.VocaluCatalog.songs.reduce((a,c)=>(a[c.rarity]=(a[c.rarity]||0)+1,a),{}), {N:100,R:80,SR:45,UR:15});
 assert.deepEqual(global.VocaluCatalog.producers.reduce((a,c)=>(a[c.rarity]=(a[c.rarity]||0)+1,a),{}), {N:4,R:6,SR:6,UR:4});
 assert.deepEqual(global.VocaluCatalog.singers.reduce((a,c)=>(a[c.rarity]=(a[c.rarity]||0)+1,a),{}), {N:16,R:12,SR:8,UR:4});
+assert.deepEqual([...new Set(global.VocaluCatalog.singers.filter(c => c.rarity === 'N').map(c => c.cost + ':' + c.boost))], ['1:1000'], 'N singers have the entry equipment rate');
+assert.deepEqual([...new Set(global.VocaluCatalog.singers.filter(c => c.rarity === 'R').map(c => c.cost + ':' + c.boost))], ['1:1500'], 'R singers improve the one-cost equipment rate');
+assert.deepEqual([...new Set(global.VocaluCatalog.singers.filter(c => c.rarity === 'SR').map(c => c.cost + ':' + c.boost))], ['2:2500'], 'SR singers match their two-cost investment');
+assert.deepEqual([...new Set(global.VocaluCatalog.singers.filter(c => c.rarity === 'UR').map(c => c.cost + ':' + c.boost))], ['3:4000'], 'UR singers provide a finisher-class boost');
 assert.deepEqual(global.VocaluCatalog.migrateCollection({'song-001':2,'song-001-sp':1,'missing-card':9}), {'song-001':3}, 'collector ownership migrates once into the base card');
 assert.ok(global.VocaluCatalog.songs.find(c => c.name === 'ローリンガール').videoUrl.includes('vnw8zURAxkU'));
 assert.ok(global.VocaluCatalog.producers.find(c => c.name === 'じん').thumbnailUrl.includes('/552.jpg'), 'Jin uses the verified producer profile');
