@@ -7,6 +7,7 @@
 
   var RARITY_WEIGHTS = { N: 55, R: 28, SR: 12, UR: 5 };
   var RARITIES = ['N', 'R', 'SR', 'UR'];
+  var LEADER_POWER = { normal: 500, awakened: 1000 };
 
   function clone(value) { return JSON.parse(JSON.stringify(value)); }
   function randomItem(items, rng) { return items[Math.floor(rng() * items.length)]; }
@@ -144,9 +145,10 @@
       song.encoreUsed = false;
       song.singer = null;
       if (p.leader === 'miku' && !p.leaderSkillUsed) {
-        song.turnPowerBonus += p.leaderAwakened ? 1500 : 1000;
+        var mikuBonus = p.leaderAwakened ? LEADER_POWER.awakened : LEADER_POWER.normal;
+        song.turnPowerBonus += mikuBonus;
         p.leaderSkillUsed = true;
-        state.log.unshift('初音ミク「FIRST STAGE」· POWER +' + (p.leaderAwakened ? 1500 : 1000));
+        state.log.unshift('初音ミク「FIRST STAGE」· POWER +' + mikuBonus + (p.leaderAwakened ? ' · AWAKEN' : ''));
       }
       if (p.field.length >= 3) p.discard.push(p.field.splice(replaceIndex, 1)[0]);
       p.field.push(song);
@@ -231,9 +233,10 @@
       if (!attackTarget.attacked) throw new Error('ACTIVE状態の楽曲は攻撃対象にできません');
     }
     if (p.leader === 'teto' && !p.leaderSkillUsed) {
-      attacker.turnPowerBonus = (attacker.turnPowerBonus || 0) + (p.leaderAwakened ? 2000 : 1000);
+      var tetoBonus = p.leaderAwakened ? LEADER_POWER.awakened : LEADER_POWER.normal;
+      attacker.turnPowerBonus = (attacker.turnPowerBonus || 0) + tetoBonus;
       p.leaderSkillUsed = true;
-      state.log.unshift('重音テト「REPEAT BEAT」· POWER +' + (p.leaderAwakened ? 2000 : 1000));
+      state.log.unshift('重音テト「REPEAT BEAT」· POWER +' + tetoBonus + (p.leaderAwakened ? ' · AWAKEN' : ''));
     }
     var attackPower = effectivePower(attacker);
     attacker.attacked = true;

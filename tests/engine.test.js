@@ -79,7 +79,7 @@ assert.equal(mulliganBattle.mulliganUsed,true,'mulligan is marked as used');
 assert.throws(()=>E.mulligan(mulliganBattle,[0],() => 0.2),/1ゲームに1回/,'mulligan cannot be used twice');
 E.playCard(battle,'user',0,0);
 assert.equal(battle.user.field.length,1);
-assert.equal(battle.user.field[0].turnPowerBonus,1000,'Miku strengthens the first song played each turn');
+assert.equal(battle.user.field[0].turnPowerBonus,500,'Miku gives a measured bonus to the first song played each turn');
 assert.equal(battle.user.leaderSkillUsed,true,'Miku leader skill is limited to once per turn');
 E.endTurn(battle,'user');
 E.cpuTurn(battle,()=>0.2,null);
@@ -297,8 +297,26 @@ const tetoBattle = E.makeBattle(strongDeck, weakDeck, () => 0.1);
 E.setLeaders(tetoBattle,'teto','miku');
 tetoBattle.user.field = [{...strongDeck[0],currentPower:3000,turnPowerBonus:0,attacked:false}];
 E.attack(tetoBattle,'user',0,'life',null,null);
-assert.equal(tetoBattle.user.field[0].turnPowerBonus,1000,'Teto strengthens the first attack each turn');
+assert.equal(tetoBattle.user.field[0].turnPowerBonus,500,'Teto gives a measured bonus to the first attack each turn');
 assert.equal(tetoBattle.user.leaderSkillUsed,true,'Teto leader skill is limited to once per turn');
+
+const awakenedMikuBattle = E.makeBattle(deck, deck, () => 0.2);
+E.setLeaders(awakenedMikuBattle,'miku','teto');
+awakenedMikuBattle.user.leaderAwakened = true;
+awakenedMikuBattle.user.cost = 2;
+E.playCard(awakenedMikuBattle,'user',0,0);
+assert.equal(awakenedMikuBattle.user.field[0].turnPowerBonus,1000,'Awakened Miku doubles the first-song bonus without exceeding the REST penalty');
+E.playCard(awakenedMikuBattle,'user',0,0);
+assert.equal(awakenedMikuBattle.user.field[1].turnPowerBonus,0,'Awakened Miku still activates only once per turn');
+
+const awakenedTetoBattle = E.makeBattle(strongDeck, weakDeck, () => 0.1);
+E.setLeaders(awakenedTetoBattle,'teto','miku');
+awakenedTetoBattle.user.leaderAwakened = true;
+awakenedTetoBattle.user.field = [{...strongDeck[0],currentPower:3000,turnPowerBonus:0,attacked:false},{...strongDeck[1],currentPower:3000,turnPowerBonus:0,attacked:false}];
+E.attack(awakenedTetoBattle,'user',0,'life',null,null);
+assert.equal(awakenedTetoBattle.user.field[0].turnPowerBonus,1000,'Awakened Teto doubles the first-attack bonus without deciding combat alone');
+E.attack(awakenedTetoBattle,'user',1,'life',null,null);
+assert.equal(awakenedTetoBattle.user.field[1].turnPowerBonus,0,'Awakened Teto still activates only once per turn');
 
 const songTriggerBattle = E.makeBattle(strongDeck, weakDeck, () => 0.1);
 const triggerSong = global.VocaluCatalog.songs.find(c => c.cost >= 6 && c.trigger && c.trigger.type === 'conditional_play');
