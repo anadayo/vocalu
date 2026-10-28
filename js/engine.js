@@ -303,11 +303,11 @@
     if (!defender.lifeCards || !defender.lifeCards.length) return null;
     var lifeCard = defender.lifeCards.pop();
     defender.hand.push(lifeCard);
-    state.lastLifeTransfer = { side: defendingSide, cardId: lifeCard.id, cardName: lifeCard.name };
+    state.lastLifeTransfer = { side: defendingSide, cardId: lifeCard.id, cardName: lifeCard.name, revealed: false };
     if (defender.life <= 0 || !lifeCard.trigger) return null;
 
-    if (lifeCard.type === 'song') {
-      if (lifeCard.trigger.type !== 'conditional_play' || defender.life >= attacker.life) return null;
+    if (lifeCard.type === 'song' && lifeCard.trigger.type === 'conditional_play') {
+      if (defender.life > 3 || defender.life >= attacker.life) return null;
       defender.hand.pop();
       var song = clone(lifeCard);
       song.currentPower = song.power;
@@ -322,6 +322,7 @@
         defender.discard.push(defender.field.splice(weakest, 1)[0]);
       }
       defender.field.push(song);
+      state.lastLifeTransfer.revealed = true;
       state.lastTrigger = { side: defendingSide, cardId: lifeCard.id, cardName: lifeCard.name, label: lifeCard.trigger.label, text: lifeCard.trigger.text, type: lifeCard.trigger.type };
       state.log.unshift('TRIGGER · ' + lifeCard.name + ' がコストなしでACTIVE登場');
       return state.lastTrigger;
@@ -346,8 +347,11 @@
       }
     } else if (effect === 'stop_attacks') {
       attacker.field.forEach(function (song) { song.attacked = true; });
+    } else if (effect === 'draw_one') {
+      drawCards(defender, 1);
     }
 
+    state.lastLifeTransfer.revealed = true;
     state.lastTrigger = { side: defendingSide, cardId: lifeCard.id, cardName: lifeCard.name, label: lifeCard.trigger.label, text: lifeCard.trigger.text, type: effect };
     state.log.unshift('TRIGGER · ' + lifeCard.name + '「' + lifeCard.trigger.label + '」');
     return state.lastTrigger;

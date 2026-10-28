@@ -27,7 +27,8 @@ assert.equal(global.VocaluCatalog.producers.every(c => c.cost === 0), true, 'all
 assert.deepEqual([...new Set(global.VocaluCatalog.cards.filter(c => c.type !== 'song' && c.trigger).map(c => c.trigger.type))].sort(), ['bounce','destroy_one','discard_one','heal_one','stop_attacks'].sort(), 'support trigger pool includes reversal effects');
 assert.ok(global.VocaluCatalog.songs.filter(c => c.cost === 1).every(c => c.abilities.some(a => a.type === 'draw_one')), 'every one-cost song draws one card on entry');
 assert.ok(global.VocaluCatalog.songs.filter(c => c.cost >= 6).every(c => c.abilities && c.abilities.length), 'all high-cost songs have an ability');
-assert.ok(global.VocaluCatalog.songs.filter(c => c.cost >= 6).every(c => c.trigger && c.trigger.type === 'conditional_play'), 'all high-cost songs have a comeback life trigger');
+assert.ok(global.VocaluCatalog.songs.filter(c => c.cost >= 6).every(c => c.trigger && c.trigger.type), 'all high-cost songs have a life trigger');
+assert.deepEqual([...new Set(global.VocaluCatalog.songs.filter(c => c.cost >= 6).map(c => c.trigger.type))].sort(), ['conditional_play','draw_one','stop_attacks'].sort(), 'high-cost songs use three trigger patterns instead of only free entry');
 assert.ok(global.VocaluCatalog.songs.filter(c => c.cost > 1 && c.cost < 6).every(c => !c.abilities.length), 'mid-cost songs do not receive high-cost abilities');
 assert.deepEqual(global.VocaluCatalog.songs.reduce((a,c)=>(a[c.rarity]=(a[c.rarity]||0)+1,a),{}), {N:100,R:80,SR:45,UR:15});
 assert.deepEqual(global.VocaluCatalog.producers.reduce((a,c)=>(a[c.rarity]=(a[c.rarity]||0)+1,a),{}), {N:4,R:6,SR:6,UR:4});
@@ -100,6 +101,7 @@ assert.equal(combat.cpu.lifeCards.length,4,'direct attack removes one face-down 
 assert.equal(combat.lastImpact.type,'life','direct life damage exposes the life-break animation state');
 assert.equal(combat.lastLifeTransfer.side,'cpu','life damage reports which leader sends a card to hand');
 assert.ok(combat.lastLifeTransfer.cardId,'life-to-hand animation receives the exact revealed card');
+assert.equal(combat.lastLifeTransfer.revealed,false,'ordinary life cards stay face-down during the hand transfer');
 combat.cpu.life = 1;
 combat.user.field[0].attacked = false;
 E.attack(combat,'user',0,'life',null,null);
@@ -332,6 +334,19 @@ assert.equal(songTriggerBattle.user.life,2,'high-cost trigger test takes one lif
 assert.equal(songTriggerBattle.user.field.some(card => card.id === triggerSong.id),true,'high-cost life trigger plays the song for free while behind');
 assert.equal(songTriggerBattle.user.field.find(card => card.id === triggerSong.id).attacked,false,'triggered high-cost song enters active');
 assert.equal(songTriggerBattle.user.hand.some(card => card.id === triggerSong.id),false,'successfully triggered song leaves the hand for the field');
+assert.equal(songTriggerBattle.lastLifeTransfer.revealed,true,'an activated song trigger may reveal its face');
+
+const earlySongTriggerBattle = E.makeBattle(strongDeck, weakDeck, () => 0.1);
+earlySongTriggerBattle.user.life = 5;
+earlySongTriggerBattle.user.lifeCards = [{...triggerSong}];
+earlySongTriggerBattle.cpu.life = 5;
+earlySongTriggerBattle.cpu.field = [{...weakDeck[0],currentPower:1000,attacked:false}];
+earlySongTriggerBattle.active = 'cpu';
+E.attack(earlySongTriggerBattle,'cpu',0,'life',null,null);
+assert.equal(earlySongTriggerBattle.user.life,4,'early trigger test takes one life damage');
+assert.equal(earlySongTriggerBattle.user.field.some(card => card.id === triggerSong.id),false,'song triggers cannot enter while the defender remains above three life');
+assert.equal(earlySongTriggerBattle.user.hand.some(card => card.id === triggerSong.id),true,'an inactive early song trigger goes to hand normally');
+assert.equal(earlySongTriggerBattle.lastLifeTransfer.revealed,false,'an inactive song trigger stays face-down');
 
 const discardState = E.makeBattle(strongDeck, weakDeck, () => 0.1);
 const attackerHandBefore = discardState.user.hand.length;

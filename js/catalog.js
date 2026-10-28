@@ -143,8 +143,14 @@
     if (cost >= 7 && !abilities.some(function (ability) { return ability.type === 'ready_entry'; })) abilities.push(songAbilityPool[1]);
     return abilities;
   }
-  function triggerForSong(cost) {
-    return cost >= 6 ? { type:'conditional_play', label:'逆転ライブ', text:'LIFEから加わる時、自分のLIFEが相手より少なければ、コストを払わずACTIVEで登場する。' } : null;
+  function triggerForSong(index, cost) {
+    if (cost < 6) return null;
+    var songTriggers = [
+      { type:'conditional_play', label:'逆転ライブ', text:'LIFEから加わる時、自分のLIFEが3以下かつ相手より少なければ、コストを払わずACTIVEで登場する。' },
+      { type:'draw_one', label:'アンコール・ドロー', text:'このカードを手札に加え、さらにデッキからカードを1枚引く。' },
+      { type:'stop_attacks', label:'クライマックス・ブレイク', text:'相手の場の楽曲は、このターンこれ以上攻撃できない。' }
+    ];
+    return songTriggers[index % songTriggers.length];
   }
   function producerCost() {
     return 0;
@@ -180,7 +186,7 @@
         power: basePower,
         cost: cost,
         abilities: abilitiesForSong(index, cost),
-        trigger: triggerForSong(cost),
+        trigger: triggerForSong(index, cost),
         viewCount: null,
         viewCountVerifiedAt: null,
         videoUrl: videoId ? 'https://www.youtube.com/watch?v=' + videoId : artwork ? artwork.url : syncedMedia ? syncedMedia.mediaUrl : null,
