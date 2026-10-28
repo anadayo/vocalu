@@ -25,8 +25,9 @@ assert.equal(global.VocaluCatalog.producers.filter(c => c.abilities && c.abiliti
 assert.ok(global.VocaluCatalog.producers.some(c => c.abilities.length > 1), 'some producers have multi-line support effects');
 assert.equal(global.VocaluCatalog.producers.every(c => c.cost === 0), true, 'all producer cards cost zero');
 assert.deepEqual([...new Set(global.VocaluCatalog.cards.filter(c => c.trigger).map(c => c.trigger.type))].sort(), ['bounce','destroy_one','discard_one','heal_one','stop_attacks'].sort(), 'support trigger pool includes reversal effects');
+assert.ok(global.VocaluCatalog.songs.filter(c => c.cost === 1).every(c => c.abilities.some(a => a.type === 'draw_one')), 'every one-cost song draws one card on entry');
 assert.ok(global.VocaluCatalog.songs.filter(c => c.cost >= 6).every(c => c.abilities && c.abilities.length), 'all high-cost songs have an ability');
-assert.ok(global.VocaluCatalog.songs.filter(c => c.cost < 6).every(c => !c.abilities.length), 'low-cost songs do not receive high-cost abilities');
+assert.ok(global.VocaluCatalog.songs.filter(c => c.cost > 1 && c.cost < 6).every(c => !c.abilities.length), 'mid-cost songs do not receive high-cost abilities');
 assert.deepEqual(global.VocaluCatalog.songs.reduce((a,c)=>(a[c.rarity]=(a[c.rarity]||0)+1,a),{}), {N:100,R:80,SR:45,UR:15});
 assert.deepEqual(global.VocaluCatalog.producers.reduce((a,c)=>(a[c.rarity]=(a[c.rarity]||0)+1,a),{}), {N:4,R:6,SR:6,UR:4});
 assert.deepEqual(global.VocaluCatalog.singers.reduce((a,c)=>(a[c.rarity]=(a[c.rarity]||0)+1,a),{}), {N:16,R:12,SR:8,UR:4});

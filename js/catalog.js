@@ -137,6 +137,7 @@
     { type:'encore_on_ko', label:'ダブルアンコール', text:'相手の楽曲を倒した時、1ターンに1回だけACTIVEに戻る。' }
   ];
   function abilitiesForSong(index, cost) {
+    if (cost === 1) return [songAbilityPool[0]];
     if (cost < 6) return [];
     var abilities = [songAbilityPool[index % songAbilityPool.length]];
     if (cost >= 7 && !abilities.some(function (ability) { return ability.type === 'ready_entry'; })) abilities.push(songAbilityPool[1]);
