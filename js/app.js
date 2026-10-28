@@ -237,7 +237,7 @@
     var incoming=state.pendingAttack&&((side==='cpu'&&state.pendingAttack.attackerIndex===index)||(side==='user'&&state.pendingAttack.targetType==='song'&&state.pendingAttack.targetIndex===index));
     return '<div class="battle-slot ' + (selected?'selected ':'') + (target?'targetable ':'') + (incoming?(side==='cpu'?'attacking ':'under-attack '):'') + (song.attacked?'used':'') + '"><button class="slot-card" data-action="select-unit" data-side="' + side + '" data-index="' + index + '">' + cardFace(song,true) + '</button><button class="inspect" data-action="battle-detail" data-side="' + side + '" data-index="' + index + '" aria-label="詳細">⌕</button></div>';
   }
-  function lifeCards(player,side) { var cards='';for(var i=0;i<player.life;i+=1)cards+='<span class="life-card">V</span>';var incoming=side==='user'&&state.pendingAttack&&state.pendingAttack.targetType==='life';return '<button class="life-target ' + (side==='cpu'&&state.targeting!=null?'targetable ':'') + (incoming?'under-attack ':'') + '" ' + (side==='cpu'&&state.targeting!=null?'data-action="attack-life"':'disabled') + '><b>LIFE ' + player.life + '</b><span class="life-cards">' + cards + '</span></button>'; }
+  function lifeCards(player,side) { var cells='';for(var i=0;i<5;i+=1)cells+='<i class="life-cell ' + (i<player.life?'filled':'broken') + '"><span></span></i>';var incoming=side==='user'&&state.pendingAttack&&state.pendingAttack.targetType==='life';return '<button class="life-target digital-life-target ' + (side==='cpu'&&state.targeting!=null?'targetable ':'') + (incoming?'under-attack ':'') + '" ' + (side==='cpu'&&state.targeting!=null?'data-action="attack-life"':'disabled') + '><span class="life-readout"><small>LIFE</small><b>' + player.life + '</b><em>/5</em></span><span class="life-cells">' + cells + '</span></button>'; }
   function pileHtml(player,side){
     var recent=player.discard.slice(-3).reverse(),dropCards=recent.map(function(card,index){return '<i class="discard-preview-card" style="--drop-index:' + index + '">' + artHtml(card) + '</i>';}).join('');
     return '<div class="pile-zone ' + side + '"><button class="pile-card drop" data-action="show-discard" data-side="' + side + '" aria-label="' + (side==='user'?'あなた':'CPU') + 'のドロップを見る"><span>DROP</span><span class="discard-stack">' + (dropCards||'<i class="discard-empty">EMPTY</i>') + '</span></button><div class="pile-card deck"><span>DECK</span><span class="deck-back"><b>V</b><small>VOCALU</small></span><em>' + player.deck.length + '</em></div></div>';
@@ -245,16 +245,16 @@
   function leekMeter(player){var leaves='';for(var i=0;i<player.maxCost;i+=1)leaves+='<i class="leek-icon ' + (i<player.cost?'ready':'spent') + '"></i>';return '<div class="leek-meter"><span>葱 COST</span><b>' + player.cost + '/' + player.maxCost + '</b><div>' + leaves + '</div></div>';}
   function compactHand(player,side){
     var cards='';
-    if(side==='cpu')for(var i=0;i<player.hand.length;i+=1)cards+='<i class="hidden-hand-card">V</i>';
-    return '<div class="compact-hand ' + side + '-hand"><span>HAND</span><b>' + player.hand.length + '</b>' + (cards?'<div>' + cards + '</div>':'') + '</div>';
+    if(side==='cpu')for(var i=0;i<Math.min(3,player.hand.length);i+=1)cards+='<i class="hidden-hand-card" style="--hidden-index:' + i + '">V</i>';
+    return '<div class="compact-hand ' + side + '-hand"><span>HAND</span><b>' + player.hand.length + '</b>' + (cards?'<div class="opponent-hand-stack">' + cards + '<strong>×' + player.hand.length + '</strong></div>':'<div class="opponent-hand-stack empty"><strong>×0</strong></div>') + '</div>';
   }
   function playerStrip(player,side){
     var name=side==='cpu'?'STUDIO CPU':'YOU',label=side==='cpu'?'OPPONENT':'PLAYER';
     return '<div class="player-strip ' + side + '"><div class="player-meta"><b>' + name + '</b><small>' + label + '</small></div>' + leekMeter(player) + compactHand(player,side) + '</div>';
   }
-  function lifeRail(player,side){
-    var name=side==='cpu'?'CPU':'YOU',leader=leaderInfo(player.leader),awake=player.leaderAwakened;
-    return '<div class="life-rail ' + side + '"><div class="rail-player"><b>' + name + '</b><small class="rail-leader ' + (awake?'awakened':'') + '">' + esc(leader.name) + (awake?' · AWAKEN':'') + '</small><span><i class="mini-leek"></i>' + player.cost + '/' + player.maxCost + '</span></div>' + lifeCards(player,side) + '</div>';
+  function lifeRail(player,side,damageSide){
+    var name=side==='cpu'?'CPU':'YOU',leader=leaderInfo(player.leader),awake=player.leaderAwakened,damaged=damageSide===side;
+    return '<div class="life-rail ' + side + '"><div class="rail-player"><b>' + name + '</b><span><i class="mini-leek"></i>' + player.cost + '/' + player.maxCost + '</span></div><div class="leader-skin ' + (awake?'awakened ':'') + (damaged?'damaged ':'') + '" data-leader-skin="' + side + '"><div class="leader-art">' + (leader.image?'<img src="' + esc(leader.image) + '" alt="' + esc(leader.name) + '">':'<span>' + esc(leader.name.slice(0,1)) + '</span>') + '</div><div class="leader-name"><small>LEADER</small><b>' + esc(leader.name) + '</b></div>' + (awake?'<em>AWAKEN</em>':'') + '<i class="damage-burst"></i></div>' + lifeCards(player,side) + '</div>';
   }
   function handHtml(card,i,total,userActive,cost) {
     var offset=i-(total-1)/2,angle=Math.max(-9,Math.min(9,offset*3)),lift=Math.min(14,Math.abs(offset)*4),unavailable=!userActive||(card.cost||0)>cost;
@@ -276,18 +276,21 @@
   }
   function renderBattle() {
     var b=state.battle,u=b.user,c=b.cpu,userActive=b.active==='user';
-    var impact=b.lastImpact,leaderAwaken=b.lastLeaderAwaken;b.lastImpact=null;b.lastLeaderAwaken=null;
+    var impact=b.lastImpact,leaderAwaken=b.lastLeaderAwaken,lifeTransfer=b.lastLifeTransfer;b.lastImpact=null;b.lastLeaderAwaken=null;b.lastLifeTransfer=null;
     var cpuSlots=[0,1,2].map(function(i){return slotHtml(c.field[i],i,'cpu');}).join('');
     var userSlots=[0,1,2].map(function(i){return slotHtml(u.field[i],i,'user');}).join('');
     var hand=u.hand.map(function(card,i){return handHtml(card,i,u.hand.length,userActive,u.cost);}).join('');
     var targeting=state.targeting!=null?'<div class="target-guide">指・カーソルへ攻撃ラインが追従 · 対象をタップ<button data-action="cancel-action">取消</button></div><div class="attack-trail" data-attack-trail><i></i></div>':state.pendingAttack?'<div class="target-guide incoming-guide">CPUから攻撃中 · 点線の攻撃先を確認して防御を選択<span class="attack-arrow">↓</span></div><div class="attack-trail cpu-attack-trail" data-cpu-attack-trail><i></i></div>':'';
     var impactLabels={life:'LIFE BREAK',knockout:'KNOCKOUT',clash:'DOUBLE DROP',entry:'HIGH COST ENTRY',encore:'ENCORE ATTACK',tagteam:'TAG TEAM'};
     var impactHtml=impact?'<div class="impact-effect ' + impact.type + '"><b>' + esc(impact.label||impactLabels[impact.type]||'IMPACT') + '</b></div>':leaderAwaken?'<div class="impact-effect leader-awaken"><b>' + esc(leaderInfo(leaderAwaken.leader).name) + ' · AWAKEN</b></div>':'';
+    var transferCard=lifeTransfer&&VocaluCatalog.cards.find(function(card){return card.id===lifeTransfer.cardId;});
+    var transferHtml=lifeTransfer?'<div class="life-transfer ' + lifeTransfer.side + '"><div class="life-transfer-card"><span class="transfer-back">V</span><span class="transfer-front">' + (transferCard?artHtml(transferCard):'<b>VOCALU</b>') + '<small>' + esc(lifeTransfer.cardName||'LIFE CARD') + '</small></span></div><b>LIFE → HAND</b></div>':'';
+    var damageSide=impact&&impact.type==='life'?impact.side:null;
     var board='<section class="battle-center"><header class="battle-status"><span>TURN ' + b.turn + '</span><b class="' + (userActive?'user-turn':'cpu-turn') + '">' + (userActive?'YOUR TURN':'CPU TURN') + '</b><span>' + difficultyName() + '</span></header>' + targeting
-      + '<div class="battle-zone player-row enemy mirrored">' + pileHtml(c,'cpu') + '<div class="battle-core">' + compactHand(c,'cpu') + '<div class="battle-field enemy-field">' + cpuSlots + '</div></div>' + lifeRail(c,'cpu') + '</div>'
+      + '<div class="battle-zone player-row enemy mirrored">' + pileHtml(c,'cpu') + '<div class="battle-core">' + compactHand(c,'cpu') + '<div class="battle-field enemy-field">' + cpuSlots + '</div></div>' + lifeRail(c,'cpu',damageSide) + '</div>'
       + '<div class="stage-line"><span>VOCALU STAGE</span><button class="stage-end-turn" data-action="end-turn" ' + (userActive?'':'disabled') + '>ターン終了</button></div>'
-      + '<div class="battle-zone player-row user">' + lifeRail(u,'user') + '<div class="battle-core"><div class="battle-field user-field">' + userSlots + '</div></div>' + pileHtml(u,'user') + '</div>'
-      + (u.life<=2?'<div class="clutch-rule">LIFE 2 OR LESS · 召喚した楽曲はすぐ攻撃可能</div>':'') + '<div class="hand-zone"><div class="hand-label"><b>HAND</b><span>' + u.hand.length + ' CARDS</span></div><div class="hand">' + hand + '</div></div>' + impactHtml + '</section>';
+      + '<div class="battle-zone player-row user">' + lifeRail(u,'user',damageSide) + '<div class="battle-core"><div class="battle-field user-field">' + userSlots + '</div></div>' + pileHtml(u,'user') + '</div>'
+      + (u.life<=2?'<div class="clutch-rule">LIFE 2 OR LESS · 召喚した楽曲はすぐ攻撃可能</div>':'') + '<div class="hand-zone"><div class="hand-label"><b>HAND</b><span>' + u.hand.length + ' CARDS</span></div><div class="hand">' + hand + '</div></div>' + transferHtml + impactHtml + '</section>';
     app.innerHTML=shell(board+actionPanel(),true);
     if(state.targeting!=null)requestAnimationFrame(resetAttackTrail);
     if(state.pendingAttack)requestAnimationFrame(updateCpuAttackTrail);
@@ -318,7 +321,7 @@
     return lifeGuards.length?lifeGuards[0].index:null;
   }
   function resolveUserAttack(targetType,targetIndex) { var attacker=state.targeting,guard=chooseCpuGuard(targetType,targetIndex,attacker);state.targeting=null;if(guard<0)guard=null;VocaluEngine.attack(state.battle,'user',attacker,targetType,targetIndex,guard);if(guard!=null)toast(targetType==='life'?'CPUの楽曲がライフをガード':'CPUのACTIVE楽曲がガード');state.selectedUnit=null;afterAction(); }
-  function showTriggerNotice(resume) { var trigger=state.battle&&state.battle.lastTrigger;if(!trigger)return false;state.battle.lastTrigger=null;state.triggerResume=resume||null;render();var card=VocaluCatalog.cards.find(function(item){return item.id===trigger.cardId;});var modal=document.createElement('div');modal.className='modal trigger-modal';modal.innerHTML='<div class="dialog trigger-dialog"><span class="trigger-cut-in">TRIGGER</span><h2>' + esc(trigger.label) + '</h2>' + (card?'<div class="trigger-card">' + cardFace(card,false) + '</div>':'<b class="trigger-card-name">' + esc(trigger.cardName) + '</b>') + '<div class="trigger-effect"><span>' + esc((trigger.side==='user'?'あなた':'CPU')+'のLIFEから発動') + '</span><strong>' + esc(trigger.cardName) + '</strong><p>' + esc(trigger.text) + '</p></div><button class="primary" data-action="dismiss-trigger">効果を確認して続ける</button></div>';document.body.appendChild(modal);return true; }
+  function showTriggerNotice(resume) { var trigger=state.battle&&state.battle.lastTrigger;if(!trigger)return false;state.battle.lastTrigger=null;state.triggerResume=resume||null;render();var card=VocaluCatalog.cards.find(function(item){return item.id===trigger.cardId;});var modal=document.createElement('div');modal.className='modal trigger-modal';modal.innerHTML='<div class="dialog trigger-dialog"><span class="trigger-cut-in">TRIGGER</span><h2>' + esc(trigger.label) + '</h2>' + (card?'<div class="trigger-card">' + cardFace(card,false) + '</div>':'<b class="trigger-card-name">' + esc(trigger.cardName) + '</b>') + '<div class="trigger-effect"><span>' + esc((trigger.side==='user'?'あなた':'CPU')+'のLIFEから発動') + '</span><strong>' + esc(trigger.cardName) + '</strong><p>' + esc(trigger.text) + '</p></div><button class="primary" data-action="dismiss-trigger">効果を確認して続ける</button></div>';setTimeout(function(){if(state.battle&&!state.battle.winner)document.body.appendChild(modal);},state.light?140:720);return true; }
   function afterAction(){state.panelTab='log';if(state.battle.winner)finishBattle();else if(!showTriggerNotice(null))render();}
   function finishBattle(){
     saveCollection(state.opened);

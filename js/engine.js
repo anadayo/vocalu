@@ -77,7 +77,7 @@
       var lifeCards = deck.splice(0, 5);
       return { life: 5, lifeCards: lifeCards, deck: deck, hand: hand, field: [], discard: [], maxCost: 0, cost: 0, producerUsed: false, leader: null, leaderAwakened: false, leaderSkillUsed: false, goingSecond: goingSecond, firstTurnStarted: false };
     }
-    var state = { turn: 0, active: 'user', phase: 'main', winner: null, actionCount: 0, log: [], mulliganUsed: false, lastImpact: null };
+    var state = { turn: 0, active: 'user', phase: 'main', winner: null, actionCount: 0, log: [], mulliganUsed: false, lastImpact: null, lastLifeTransfer: null };
     state.user = player(deckCards, 3, false);
     state.cpu = player(cpuCards, 2, true);
     startTurn(state, 'user', false);
@@ -296,6 +296,7 @@
     if (!defender.lifeCards || !defender.lifeCards.length) return null;
     var lifeCard = defender.lifeCards.pop();
     defender.hand.push(lifeCard);
+    state.lastLifeTransfer = { side: defendingSide, cardId: lifeCard.id, cardName: lifeCard.name };
     if (defender.life <= 0 || !lifeCard.trigger) return null;
 
     if (lifeCard.type === 'song') {

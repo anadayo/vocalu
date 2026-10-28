@@ -98,6 +98,8 @@ E.attack(combat,'user',0,'life',null,null);
 assert.equal(combat.cpu.life,4,'direct attack removes one life');
 assert.equal(combat.cpu.lifeCards.length,4,'direct attack removes one face-down life card');
 assert.equal(combat.lastImpact.type,'life','direct life damage exposes the life-break animation state');
+assert.equal(combat.lastLifeTransfer.side,'cpu','life damage reports which leader sends a card to hand');
+assert.ok(combat.lastLifeTransfer.cardId,'life-to-hand animation receives the exact revealed card');
 combat.cpu.life = 1;
 combat.user.field[0].attacked = false;
 E.attack(combat,'user',0,'life',null,null);
