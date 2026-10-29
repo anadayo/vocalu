@@ -16,6 +16,7 @@
     selectedUnit: null, targeting: null, pendingAttack: null, panelTab: 'log', triggerResume: null, mulliganSelected: [],
     difficulty: 'normal', matchMode: 'free', leaderChoice: loadLeaderChoice(), rank: loadRank(),
     collection: loadAndMigrate(), light: matchMedia('(prefers-reduced-motion: reduce)').matches,
+    collectionType: 'all', collectionSort: 'number', collectionView: 'all', collectionQuery: '',
     music: { ready: false, playing: false, volume: 40, title: 'BGM未再生' }
   };
   var yt = null;
@@ -346,7 +347,42 @@
     state.screen='result';render();
   }
   function renderResult(){var win=state.battle.winner==='user';var ranked=state.matchMode==='ranked';var rankResult=ranked?'<div class="rank-result"><span>' + (state.battle.rankDelta>0?'+':'') + state.battle.rankDelta + ' RATE</span><b>' + rankName(state.rank.rating) + ' · ' + state.rank.rating + '</b></div>':'';app.innerHTML=shell('<section class="hero result"><span class="eyebrow">BATTLE RESULT</span><h1>' + (win?'LIVE CLEAR!':'NEXT STAGE') + '</h1><p>' + (win?'勝利しました。':'今回はCPUの勝利です。') + ' 開封した25枚をコレクションに保存しました。</p></section>' + rankResult + '<div class="actions"><button class="primary" data-action="rematch">もう一度遊ぶ</button><button class="secondary" data-action="home">ロビーへ戻る</button><button class="secondary" data-action="collection">コレクションを見る</button></div>');}
-  function renderCollection(){var cards=VocaluCatalog.cards.filter(function(c){return state.collection[c.id];});app.innerHTML=shell('<div class="section-head"><h2>コレクション</h2><span>' + cards.length + ' / 300種</span></div>' + (cards.length?'<div class="cards">' + cards.map(function(c){return cardHtml(c,-1,false);}).join('') + '</div>':'<p class="notice">対戦を最後まで終えると、開封カードがここに保存されます。</p>') + '<div class="deck-footer"><button class="primary" data-action="home">ホームへ</button></div>');}
+  function collectionNumber(index){return 'No.'+String(index+1).padStart(3,'0');}
+  function collectionCardHtml(entry){
+    var card=entry.card,count=entry.owned,number=collectionNumber(entry.index);
+    if(!count)return '<article class="card collection-card locked"><div class="collection-slot"><span class="collection-number">'+number+'</span><span class="collection-lock" aria-label="未所持"><b>V</b><small>未所持</small></span><span class="collection-type">'+typeName(card.type)+'</span></div></article>';
+    return '<article class="card collection-card owned"><button type="button" data-action="detail" data-card="'+esc(card.id)+'">'+cardFace(card,false)+'<span class="collection-number">'+number+'</span><span class="owned-count">×'+count+'</span></button></article>';
+  }
+  function collectionEntries(){
+    var query=state.collectionQuery.toLocaleLowerCase('ja');
+    var rarityRank={N:0,R:1,SR:2,UR:3,SEC:4};
+    var entries=VocaluCatalog.cards.map(function(card,index){return {card:card,index:index,owned:Number(state.collection[card.id])||0};});
+    if(state.collectionType!=='all')entries=entries.filter(function(entry){return entry.card.type===state.collectionType;});
+    if(state.collectionView==='owned')entries=entries.filter(function(entry){return entry.owned>0;});
+    if(query)entries=entries.filter(function(entry){var card=entry.card;return [card.name,card.producer,card.profile,card.text].filter(Boolean).join(' ').toLocaleLowerCase('ja').indexOf(query)>=0;});
+    entries.sort(function(a,b){
+      if(state.collectionSort==='rarity')return (rarityRank[b.card.rarity]||0)-(rarityRank[a.card.rarity]||0)||a.index-b.index;
+      if(state.collectionSort==='cost')return (b.card.cost||0)-(a.card.cost||0)||a.index-b.index;
+      if(state.collectionSort==='power')return cardValue(b.card)-cardValue(a.card)||a.index-b.index;
+      if(state.collectionSort==='name')return a.card.name.localeCompare(b.card.name,'ja');
+      return a.index-b.index;
+    });
+    return entries;
+  }
+  function renderCollection(){
+    var all=VocaluCatalog.cards,ownedTotal=all.filter(function(card){return state.collection[card.id];}).length;
+    var completion=Math.round(ownedTotal/all.length*100),entries=collectionEntries();
+    var typeCounts=['song','producer','singer'].map(function(type){var total=all.filter(function(card){return card.type===type;}).length;var owned=all.filter(function(card){return card.type===type&&state.collection[card.id];}).length;return '<span><small>'+typeName(type)+'</small><b>'+owned+' / '+total+'</b></span>';}).join('');
+    var typeTabs=[['all','すべて'],['song','楽曲'],['producer','ボカロP'],['singer','歌い手']].map(function(item){return '<button data-action="collection-type" data-type="'+item[0]+'" aria-pressed="'+(state.collectionType===item[0])+'">'+item[1]+'</button>';}).join('');
+    var sortOptions=[['number','カード番号'],['rarity','レアリティ'],['cost','コスト'],['power','パワー'],['name','名前']].map(function(item){return '<option value="'+item[0]+'" '+(state.collectionSort===item[0]?'selected':'')+'>'+item[1]+'</option>';}).join('');
+    var empty='<div class="collection-empty"><b>該当するカードがありません</b><p>検索条件を変えるか、未所持カードも表示してみてください。</p><button class="secondary" data-action="collection-clear">条件を解除</button></div>';
+    app.innerHTML=shell('<section class="collection-head"><div><span>CARD LIBRARY</span><h1>VOCALU図鑑</h1><p>開封したカードを集めて、楽曲とクリエイターをもっと知ろう。</p></div><div class="collection-completion"><b>'+completion+'%</b><small>'+ownedTotal+' / '+all.length+' 種</small></div><div class="collection-progress"><i style="width:'+completion+'%"></i></div><div class="collection-breakdown">'+typeCounts+'</div></section>'+
+      '<form class="collection-search" data-collection-form><label><span>カード検索</span><input type="search" data-collection-query value="'+esc(state.collectionQuery)+'" placeholder="楽曲名・ボカロP・歌い手" autocomplete="off"></label><button type="submit">検索</button></form>'+
+      '<div class="collection-tabs" role="group" aria-label="カード種別">'+typeTabs+'</div>'+
+      '<div class="collection-toolbar"><div role="group" aria-label="所持状況"><button data-action="collection-view" data-view="all" aria-pressed="'+(state.collectionView==='all')+'">図鑑</button><button data-action="collection-view" data-view="owned" aria-pressed="'+(state.collectionView==='owned')+'">所持のみ</button></div><label><span>並び順</span><select data-collection-sort>'+sortOptions+'</select></label><small>'+entries.length+'件</small></div>'+
+      (entries.length?'<div class="cards collection-grid">'+entries.map(collectionCardHtml).join('')+'</div>':empty)+
+      '<div class="deck-footer"><button class="primary" data-action="home">ホームへ</button></div>');
+  }
   function mediaEmbed(card){if(card.type!=='song'||!card.videoUrl)return '';var url=card.videoUrl,embed='';var youtube=url.match(/[?&]v=([\w-]{6,})/)||url.match(/youtu\.be\/([\w-]{6,})/);var nico=url.match(/nicovideo\.jp\/watch\/(sm\d+)/);if(youtube)embed='https://www.youtube-nocookie.com/embed/'+youtube[1]+'?playsinline=1';else if(nico)embed='https://embed.nicovideo.jp/watch/'+nico[1];if(!embed)return '';return '<div class="song-player"><span>公式楽曲を再生</span><iframe src="' + esc(embed) + '" title="' + esc(card.name) + ' 公式動画" loading="lazy" allow="accelerometer; autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe></div>';}
   function detailContent(card){var text=card.type==='song'?card.metricNote:(card.text||card.profile);var trigger=card.trigger?'<div class="trigger-detail"><b>TRIGGER · ' + esc(card.trigger.label) + '</b><p>' + esc(card.trigger.text) + '</p></div>':'';var abilities=(card.abilities||[]).map(function(ability){return '<div class="ability-detail"><b>' + esc(ability.label) + '</b><p>' + esc(ability.text) + '</p></div>';}).join('');var equip=card.singer?'<div class="equipment-detail"><h3>装備中の歌い手</h3>' + cardFace(card.singer,false) + '<p>POWER +' + card.singer.boost + '</p></div>':'';var source=card.videoUrl||card.profileUrl;return '<div class="detail-card">' + cardFace(card,false) + '</div><p>' + esc(text) + '</p>' + abilities + trigger + equip + mediaEmbed(card) + (source?'<a class="official-link" href="' + esc(source) + '" target="_blank" rel="noopener">掲載元を見る</a>':'');}
   function cardDetail(id){var card=VocaluCatalog.cards.find(function(c){return c.id===id;});if(card)choose(card.name,detailContent(card)+'<p>所持 ' + (state.collection[id]||0) + '枚</p>');}
@@ -407,6 +443,9 @@
     else if(action==='support-finish')button.closest('.support-modal').remove();
     else if(action==='close-modal')button.closest('.modal').remove();
     else if(action==='collection'){state.screen='collection';render();}
+    else if(action==='collection-type'){state.collectionType=button.dataset.type||'all';render();}
+    else if(action==='collection-view'){state.collectionView=button.dataset.view==='owned'?'owned':'all';render();}
+    else if(action==='collection-clear'){state.collectionType='all';state.collectionView='all';state.collectionSort='number';state.collectionQuery='';render();}
     else if(action==='home'){state.screen='home';render();}
     else if(action==='restart'||action==='rematch')beginMatch(state.matchMode);
     else if(action==='toggle-light'){state.light=!state.light;render();}
@@ -420,6 +459,8 @@
     else if(action==='force-rare'){var forced=VocaluCatalog.cards.find(function(c){return c.rarity===button.dataset.rare;});flash(button.dataset.rare);choose(button.dataset.rare+'演出確認',cardHtml(forced,-1,false));}
     else if(action==='reset-save'){localStorage.removeItem(STORAGE);localStorage.removeItem(MIGRATION);localStorage.removeItem(RANK_STORAGE);localStorage.removeItem(RANK_BOARD_STORAGE);localStorage.removeItem(PLAYER_PROFILES_STORAGE);localStorage.removeItem(CURRENT_PLAYER_STORAGE);localStorage.removeItem(LEADER_STORAGE);state.collection={};state.rank={username:'',rating:1000,wins:0,losses:0};state.leaderChoice='miku';render();}
   }catch(err){toast(err.message||'操作を続けられませんでした');console.error(err);}});
+  document.addEventListener('submit',function(event){if(!event.target.matches('[data-collection-form]'))return;event.preventDefault();var input=event.target.querySelector('[data-collection-query]');state.collectionQuery=(input&&input.value||'').trim();render();});
+  document.addEventListener('change',function(event){if(!event.target.matches('[data-collection-sort]'))return;state.collectionSort=event.target.value;render();});
   document.addEventListener('input',function(event){if(!event.target.matches('[data-volume]'))return;state.music.volume=Number(event.target.value);var label=event.target.closest('.dialog').querySelector('[data-volume-label]');if(label)label.textContent=state.music.volume;if(yt&&state.music.ready)yt.setVolume(state.music.volume);});
   var startY=0;app.addEventListener('touchstart',function(e){var p=e.target.closest('[data-action="open-pack"]');if(p&&e.touches[0])startY=e.touches[0].clientY;},{passive:true});app.addEventListener('touchend',function(e){var p=e.target.closest('[data-action="open-pack"]');if(p&&e.changedTouches[0]&&startY-e.changedTouches[0].clientY>35)p.click();},{passive:true});
   app.addEventListener('pointermove',function(e){if(state.targeting!=null)updateAttackTrail(e.clientX,e.clientY);},{passive:true});
