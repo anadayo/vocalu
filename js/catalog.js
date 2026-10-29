@@ -120,6 +120,12 @@
   }
   function powerFor(index) { return 1000 + ((index * 7) % 19) * 500; }
   function songCost(power) { return Math.max(1, Math.min(10, Math.ceil(power / 1500))); }
+  var balanceConfig = {
+    version: '2026-10-29-v1',
+    triggerTargets: { stop_attacks:18, draw_one:20, conditional_play:20, heal_one:10, bounce:9, discard_one:8, destroy_one:8 },
+    midCostPower: { 3:500, 4:500, 5:1000, 6:1000 },
+    creatorSynergyPower: 1000
+  };
   var triggerEffects = [
     { type:'destroy_one', label:'ステージブレイク', text:'相手の場で最もパワーが高い楽曲1枚を倒す。' },
     { type:'heal_one', label:'リカバリーライブ', text:'デッキの上から1枚をLIFEに置き、LIFEを1回復する。' },
@@ -136,9 +142,28 @@
     { type:'ready_entry', label:'クイック・ライブ', text:'この楽曲はACTIVE状態で登場し、すぐ攻撃できる。' },
     { type:'encore_on_ko', label:'ダブルアンコール', text:'相手の楽曲を倒した時、1ターンに1回だけACTIVEに戻る。' }
   ];
+  var midCostAbilityPool = {
+    3: [
+      { type:'power_self', amount:500, label:'リズムブースト', text:'登場時、このターン自身をPOWER +500。' },
+      { type:'draw_one', label:'セットリスト', text:'登場時、デッキからカードを1枚引く。' }
+    ],
+    4: [
+      { type:'power_one', amount:500, label:'テンポアップ', text:'登場時、このターン自分の楽曲1枚をPOWER +500。' },
+      { type:'ensemble', amount:500, label:'アンサンブル', text:'登場時、ほかの自分の楽曲があれば、このターン自身をPOWER +500。' }
+    ],
+    5: [
+      { type:'draw_one', label:'アンコール・ドロー', text:'登場時、デッキからカードを1枚引く。' },
+      { type:'power_one', amount:1000, label:'リミックス', text:'登場時、このターン自分の楽曲1枚をPOWER +1000。' }
+    ],
+    6: [
+      { type:'ensemble', amount:1000, label:'フルアンサンブル', text:'登場時、ほかの自分の楽曲があれば、このターン自身をPOWER +1000。' },
+      { type:'draw_one', label:'クライマックス・ドロー', text:'登場時、デッキからカードを1枚引く。' }
+    ]
+  };
   function abilitiesForSong(index, cost) {
     if (cost === 1) return [songAbilityPool[0]];
-    if (cost < 6) return [];
+    if (cost >= 3 && cost <= 6) return [midCostAbilityPool[cost][index % midCostAbilityPool[cost].length]];
+    if (cost < 7) return [];
     var abilities = [songAbilityPool[index % songAbilityPool.length]];
     if (cost >= 7 && !abilities.some(function (ability) { return ability.type === 'ready_entry'; })) abilities.push(songAbilityPool[1]);
     return abilities;
@@ -155,8 +180,9 @@
   function producerCost() {
     return 0;
   }
-  function abilitiesForProducer(index, cost) {
-    if (index < 10) return [{ type:'reveal_top_cost_song', maxCost:1, label:'ルーキー・サーチ', text:'デッキの上から1枚を公開する。1コストの楽曲なら手札に加え、それ以外はデッキの下へ送る。' }];
+  function abilitiesForProducer(index, cost, name) {
+    var synergy={ type:'creator_synergy', producer:name, amount:balanceConfig.creatorSynergyPower, label:'クリエイターリンク', text:'自分の制作楽曲が場にあれば、このターンその楽曲をPOWER +'+balanceConfig.creatorSynergyPower+'。' };
+    if (index < 10) return [{ type:'reveal_top_cost_song', maxCost:1, label:'ルーキー・サーチ', text:'デッキの上から1枚を公開する。1コストの楽曲なら手札に加え、それ以外はデッキの下へ送る。' },synergy];
     var patterns = [
       [{ type:'draw_cards', count:2, label:'クリエイターズ・ドロー', text:'カードを2枚引く。' }],
       [{ type:'power_all', amount:1000, label:'フルミックス', text:'このターン、自分の楽曲すべてをPOWER +1000。' }],
@@ -166,7 +192,7 @@
         { type:'power_all', amount:500, label:'マスタリング', text:'このターン、自分の楽曲すべてをPOWER +500。' }
       ]
     ];
-    return patterns[index % patterns.length];
+    return patterns[index % patterns.length].concat([synergy]);
   }
 
   var songs = [];
@@ -201,7 +227,7 @@
   var producers = producerNames.map(function (name, index) {
     var profile = producerProfiles[name];
     var cost = producerCost(index);
-    var abilities = abilitiesForProducer(index, cost);
+    var abilities = abilitiesForProducer(index, cost, name);
     return { id: 'producer-' + String(index + 1).padStart(2, '0'), type: 'producer', name: name, rarity: rarityByQuota(index, [4, 6, 6, 4]), cost: cost, abilities: abilities, text: '1ターンに1枚だけ使える使い切りサポート。' + abilities.map(function (ability) { return ability.text; }).join(' '), trigger: triggerFor(index, 0), thumbnailUrl: profile.image, thumbnailVerified: true, profileUrl: profile.source, mediaSource: profile.label, mediaVerifiedAt: '2026-10-17' };
   });
   var singers = singerNames.map(function (name, index) {
@@ -209,6 +235,26 @@
     var rarity = rarityByQuota(index, [16, 12, 8, 4]);
     var singerStats = { N:{ cost:1, boost:1000 }, R:{ cost:1, boost:1500 }, SR:{ cost:2, boost:2500 }, UR:{ cost:3, boost:4000 } }[rarity];
     return { id: 'singer-' + String(index + 1).padStart(2, '0'), type: 'singer', name: name, rarity: rarity, cost: singerStats.cost, boost: singerStats.boost, profile: '楽曲に装備し、歌声の個性でパワーを加えるサポートカード。', trigger: triggerFor(index, 2), thumbnailUrl: profile.image, thumbnailVerified: true, profileUrl: profile.source, mediaSource: profile.label, mediaVerifiedAt: '2026-10-17' };
+  });
+
+  // 93枚の候補へ、逆転手段が一種類へ偏らないよう確定配分を適用する。
+  var triggerTemplates = {
+    conditional_play:{ type:'conditional_play', label:'逆転ライブ', text:'LIFEから加わる時、自分のLIFEが3以下かつ相手より少なければ、コストを払わずACTIVEで登場する。' },
+    draw_one:{ type:'draw_one', label:'アンコール・ドロー', text:'このカードを手札に加え、さらにデッキからカードを1枚引く。' },
+    stop_attacks:{ type:'stop_attacks', label:'ブレイクタイム', text:'相手の場の楽曲は、このターンこれ以上攻撃できない。' },
+    heal_one:triggerEffects[1], bounce:triggerEffects[3], discard_one:triggerEffects[2], destroy_one:triggerEffects[0]
+  };
+  var triggerCandidates=songs.filter(function(card){return card.cost>=6;})
+    .concat(producers.filter(function(card,index){return index%2===0;}))
+    .concat(singers.filter(function(card,index){return index%2===0;}));
+  var triggerOrder=['conditional_play','draw_one','stop_attacks','heal_one','bounce','discard_one','destroy_one'];
+  var triggerCursor=0;
+  songs.concat(producers,singers).forEach(function(card){card.trigger=null;});
+  triggerOrder.forEach(function(type){
+    for(var i=0;i<balanceConfig.triggerTargets[type];i+=1){
+      triggerCandidates[triggerCursor].trigger=Object.assign({},triggerTemplates[type]);
+      triggerCursor+=1;
+    }
   });
 
   var catalog = songs.concat(producers, singers);
@@ -221,5 +267,5 @@
     });
     return migrated;
   }
-  root.VocaluCatalog = { cards: catalog, songs: songs, producers: producers, singers: singers, legacyIdMap: legacyIdMap, migrateCollection: migrateCollection, counts: { songs: songs.length, producers: producers.length, singers: singers.length, total: catalog.length } };
+  root.VocaluCatalog = { cards: catalog, songs: songs, producers: producers, singers: singers, balanceConfig: balanceConfig, legacyIdMap: legacyIdMap, migrateCollection: migrateCollection, counts: { songs: songs.length, producers: producers.length, singers: singers.length, total: catalog.length } };
 }(typeof self !== 'undefined' ? self : this));

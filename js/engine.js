@@ -8,6 +8,7 @@
   var RARITY_WEIGHTS = { N: 55, R: 28, SR: 12, UR: 5 };
   var RARITIES = ['N', 'R', 'SR', 'UR'];
   var LEADER_POWER = { normal: 500, awakened: 1000 };
+  var DEFAULT_RULES = { secondPlayerCostBonusTurns: 3, maxCost: 10, maxField: 3 };
 
   function clone(value) { return JSON.parse(JSON.stringify(value)); }
   function randomItem(items, rng) { return items[Math.floor(rng() * items.length)]; }
@@ -69,15 +70,15 @@
     return selected.map(function (x) { return x.index; });
   }
 
-  function makeBattle(deckCards, cpuCards, rng) {
+  function makeBattle(deckCards, cpuCards, rng, rules) {
     rng = rng || Math.random;
     function player(cards, openingSize, goingSecond) {
       var deck = clone(cards).sort(function () { return rng() - 0.5; });
       var hand = deck.splice(0, openingSize);
       var lifeCards = deck.splice(0, 5);
-      return { life: 5, lifeCards: lifeCards, deck: deck, hand: hand, field: [], discard: [], maxCost: 0, cost: 0, producerUsed: false, leader: null, leaderAwakened: false, leaderSkillUsed: false, goingSecond: goingSecond, firstTurnStarted: false };
+      return { life: 5, lifeCards: lifeCards, deck: deck, hand: hand, field: [], discard: [], maxCost: 0, cost: 0, producerUsed: false, leader: null, leaderAwakened: false, leaderSkillUsed: false, goingSecond: goingSecond, firstTurnStarted: false, turnsStarted: 0 };
     }
-    var state = { turn: 0, active: 'user', phase: 'main', winner: null, actionCount: 0, log: [], mulliganUsed: false, lastImpact: null, lastLifeTransfer: null, lastMotion: null, lastLeaderSkill: null };
+    var state = { turn: 0, active: 'user', phase: 'main', winner: null, actionCount: 0, log: [], mulliganUsed: false, lastImpact: null, lastLifeTransfer: null, lastMotion: null, lastLeaderSkill: null, rules: Object.assign({},DEFAULT_RULES,rules||{}) };
     state.user = player(deckCards, 3, false);
     state.cpu = player(cpuCards, 2, true);
     startTurn(state, 'user', false);
@@ -111,10 +112,12 @@
   function startTurn(state, side, drawCard) {
     var p = state[side];
     var secondPlayerOpening = p.goingSecond && !p.firstTurnStarted;
+    p.turnsStarted += 1;
+    var secondPlayerCostBonus=p.goingSecond&&p.turnsStarted<=state.rules.secondPlayerCostBonusTurns;
     state.turn += side === 'user' ? 1 : 0;
     state.active = side;
     state.phase = 'main';
-    p.maxCost = Math.min(10, p.maxCost + 1 + (secondPlayerOpening ? 1 : 0));
+    p.maxCost = Math.min(state.rules.maxCost, p.turnsStarted + (secondPlayerCostBonus ? 1 : 0));
     p.cost = p.maxCost;
     p.producerUsed = false;
     p.leaderSkillUsed = false;
@@ -122,7 +125,7 @@
     var drawCount = drawCard === false ? 0 : secondPlayerOpening ? 2 : 1;
     drawCards(p, drawCount);
     state.lastMotion = { type: 'turn', side: side, drawCount: drawCount, turn: state.turn };
-    if (secondPlayerOpening) state.log.unshift('後攻ボーナス · 葱COST +1');
+    if (secondPlayerCostBonus) state.log.unshift('後攻'+p.turnsStarted+'ターン目ボーナス · 葱COST +1');
     if (drawCount) state.log.unshift((secondPlayerOpening ? '後攻ボーナス · ' : '') + drawCount + '枚ドロー');
     p.firstTurnStarted = true;
     state.log.unshift((side === 'user' ? 'あなた' : 'CPU') + 'のターン');
@@ -155,10 +158,7 @@
       if (p.field.length >= 3) p.discard.push(p.field.splice(replaceIndex, 1)[0]);
       p.field.push(song);
       state.lastMotion = { type: 'summon', side: side, index: p.field.length - 1, cardId: song.id, rarity: song.rarity, cost: song.cost || 0 };
-      if (hasAbility(song, 'draw_one') && p.deck.length) {
-        p.hand.push(p.deck.shift());
-        state.log.unshift(card.name + '「アンコール・ドロー」· 1枚ドロー');
-      }
+      resolveEntryAbilities(state,side,song);
       if ((card.cost || 0) >= 6) {
         state.lastImpact = { type: 'entry', side: side, label: (song.abilities || []).map(function (ability) { return ability.label; }).join(' / ') || 'HIGH COST ENTRY' };
       }
@@ -193,6 +193,10 @@
           var destroyed = enemy.field.splice(0, enemy.field.length);
           enemy.discard = enemy.discard.concat(destroyed);
           if (destroyed.length) state.lastImpact = { type: 'knockout', side: side === 'user' ? 'cpu' : 'user', label: 'ALL BREAK' };
+        } else if (ability.type === 'creator_synergy') {
+          var linked=p.field.filter(function(song){return song.producer===ability.producer;});
+          linked.forEach(function(song){song.turnPowerBonus=(song.turnPowerBonus||0)+(ability.amount||0);});
+          if(linked.length)state.log.unshift(card.name+'の制作楽曲 '+linked.length+'枚を強化');
         }
         state.log.unshift(card.name + '「' + ability.label + '」· ' + ability.text);
       });
@@ -304,7 +308,7 @@
     var lifeCard = defender.lifeCards.pop();
     defender.hand.push(lifeCard);
     state.lastLifeTransfer = { side: defendingSide, cardId: lifeCard.id, cardName: lifeCard.name, revealed: false };
-    if (defender.life <= 0 || !lifeCard.trigger) return null;
+    if (!lifeCard.trigger) return null;
 
     if (lifeCard.type === 'song' && lifeCard.trigger.type === 'conditional_play') {
       if (defender.life > 3 || defender.life >= attacker.life) return null;
@@ -370,6 +374,18 @@
     return Boolean(card && (card.abilities || []).some(function (ability) { return ability.type === type; }));
   }
 
+  function resolveEntryAbilities(state,side,song){
+    var p=state[side];
+    (song.abilities||[]).forEach(function(ability){
+      if(ability.type==='draw_one')drawCards(p,1);
+      else if(ability.type==='power_self')song.turnPowerBonus=(song.turnPowerBonus||0)+(ability.amount||0);
+      else if(ability.type==='power_one'&&p.field.length){var target=p.field[highestPowerIndex(p.field)];target.turnPowerBonus=(target.turnPowerBonus||0)+(ability.amount||0);}
+      else if(ability.type==='ensemble'&&p.field.length>1)song.turnPowerBonus=(song.turnPowerBonus||0)+(ability.amount||0);
+      else return;
+      state.log.unshift(song.name+'「'+ability.label+'」· '+ability.text);
+    });
+  }
+
   function drawCards(player, count) {
     for (var i = 0; i < count && player.deck.length; i += 1) player.hand.push(player.deck.shift());
   }
@@ -414,36 +430,48 @@
     return state;
   }
 
-  function cpuMainPhase(state, difficulty) {
-    if (state.active !== 'cpu' || state.winner) return state;
+  function cpuMainPhase(state, difficulty, side) {
+    side=side||'cpu';
+    if (state.active !== side || state.winner) return state;
+    var player=state[side];
     var safety = 0;
     while (safety < 20) {
       safety += 1;
-      var playable = state.cpu.hand.map(function (c, i) { return { card: c, index: i }; }).filter(function (x) {
-        return (x.card.cost || 0) <= state.cpu.cost && (x.card.type !== 'producer' || !state.cpu.producerUsed) && (x.card.type !== 'singer' || state.cpu.field.length);
+      var playable = player.hand.map(function (c, i) { return { card: c, index: i }; }).filter(function (x) {
+        return (x.card.cost || 0) <= player.cost && (x.card.type !== 'producer' || !player.producerUsed) && (x.card.type !== 'singer' || player.field.length);
       });
       if (!playable.length) break;
       playable.sort(function (a, b) {
-        var av = a.card.power || a.card.boost || a.card.bonus || 0;
-        var bv = b.card.power || b.card.boost || b.card.bonus || 0;
+        var av = cpuCardValue(a.card,player),bv = cpuCardValue(b.card,player);
         if (difficulty === 'normal') return (a.card.cost || 0) - (b.card.cost || 0) || av - bv;
-        if (difficulty === 'expert') return (b.card.type === 'song' ? 1 : 0) - (a.card.type === 'song' ? 1 : 0) || bv - av || (b.card.cost || 0) - (a.card.cost || 0);
-        return bv - av;
+        return bv-av||(b.card.cost||0)-(a.card.cost||0);
       });
       var chosen = playable[0];
       var replaceIndex = 0;
-      if (chosen.card.type === 'song' && state.cpu.field.length >= 3 && difficulty !== 'normal') {
-        replaceIndex = state.cpu.field.reduce(function (weakest, card, index, field) {
+      if (chosen.card.type === 'song' && player.field.length >= state.rules.maxField && difficulty !== 'normal') {
+        replaceIndex = player.field.reduce(function (weakest, card, index, field) {
           return effectivePower(card) < effectivePower(field[weakest]) ? index : weakest;
         }, 0);
-      } else if (chosen.card.type === 'singer' && state.cpu.field.length && difficulty !== 'normal') {
-        replaceIndex = state.cpu.field.reduce(function (best, card, index, field) {
+      } else if (chosen.card.type === 'singer' && player.field.length && difficulty !== 'normal') {
+        replaceIndex = player.field.reduce(function (best, card, index, field) {
           return effectivePower(card) > effectivePower(field[best]) ? index : best;
         }, 0);
       }
-      try { playCard(state, 'cpu', chosen.index, replaceIndex); } catch (ignore) { break; }
+      try { playCard(state, side, chosen.index, replaceIndex); } catch (ignore) { break; }
     }
     return state;
+  }
+
+  function cpuCardValue(card,player){
+    var value=(card.power||card.boost||0)-(card.cost||0)*250;
+    (card.abilities||[]).forEach(function(ability){
+      if(ability.type==='draw_cards'||ability.type==='draw_one')value+=1200*(ability.count||1);
+      else if(ability.type==='power_all')value+=(ability.amount||0)*Math.max(1,player.field.length);
+      else if(ability.type==='power_one'||ability.type==='power_self'||ability.type==='ensemble')value+=ability.amount||0;
+      else if(ability.type==='creator_synergy'&&player.field.some(function(song){return song.producer===ability.producer;}))value+=ability.amount||0;
+      else if(ability.type==='reveal_top_cost_song')value+=700;
+    });
+    return value;
   }
 
   function cpuTurn(state, rng, userGuardIndex, difficulty) {
@@ -456,7 +484,7 @@
       var index = state.cpu.field.indexOf(song);
       if (index < 0 || song.attacked || state.winner) return;
       var weakTarget = state.user.field.findIndex(function (target) { return target.attacked && song.currentPower >= effectivePower(target); });
-      if (weakTarget >= 0 && state.user.life > 1) attack(state, 'cpu', index, 'song', weakTarget);
+      if (weakTarget >= 0 && state.user.life > 1 && state.turn < 12) attack(state, 'cpu', index, 'song', weakTarget);
       else {
         attack(state, 'cpu', index, 'life', null, guardAvailable);
         guardAvailable = null;
@@ -473,11 +501,11 @@
   function bump(state) { state.actionCount += 1; if (state.actionCount > 500) throw new Error('安全のため対戦を停止しました'); validate(state); }
   function validate(state) {
     ['user', 'cpu'].forEach(function (side) {
-      if (state[side].field.length > 3) throw new Error('場の楽曲上限を超えました');
+      if (state[side].field.length > state.rules.maxField) throw new Error('場の楽曲上限を超えました');
       if (state[side].cost < 0) throw new Error('コスト計算エラーです');
     });
     return true;
   }
 
-  return { RARITY_WEIGHTS: RARITY_WEIGHTS, openPack: openPack, openFivePacks: openFivePacks, autoBuild: autoBuild, makeBattle: makeBattle, setLeaders: setLeaders, mulligan: mulligan, playCard: playCard, attack: attack, endTurn: endTurn, cpuMainPhase: cpuMainPhase, cpuTurn: cpuTurn, effectivePower: effectivePower, rankDifficulty: rankDifficulty, validate: validate };
+  return { RARITY_WEIGHTS: RARITY_WEIGHTS, DEFAULT_RULES: DEFAULT_RULES, openPack: openPack, openFivePacks: openFivePacks, autoBuild: autoBuild, makeBattle: makeBattle, setLeaders: setLeaders, mulligan: mulligan, playCard: playCard, attack: attack, endTurn: endTurn, cpuMainPhase: cpuMainPhase, cpuTurn: cpuTurn, effectivePower: effectivePower, rankDifficulty: rankDifficulty, validate: validate };
 }));

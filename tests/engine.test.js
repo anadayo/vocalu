@@ -24,12 +24,12 @@ assert.equal(global.VocaluCatalog.singers.filter(c => c.trigger && c.trigger.typ
 assert.equal(global.VocaluCatalog.producers.filter(c => c.abilities && c.abilities.length).length, 20, 'all producers have support effects');
 assert.ok(global.VocaluCatalog.producers.some(c => c.abilities.length > 1), 'some producers have multi-line support effects');
 assert.equal(global.VocaluCatalog.producers.every(c => c.cost === 0), true, 'all producer cards cost zero');
-assert.deepEqual([...new Set(global.VocaluCatalog.cards.filter(c => c.type !== 'song' && c.trigger).map(c => c.trigger.type))].sort(), ['bounce','destroy_one','discard_one','heal_one','stop_attacks'].sort(), 'support trigger pool includes reversal effects');
+assert.deepEqual(global.VocaluCatalog.cards.filter(c=>c.trigger).reduce((a,c)=>(a[c.trigger.type]=(a[c.trigger.type]||0)+1,a),{}), {conditional_play:20,draw_one:20,stop_attacks:18,heal_one:10,bounce:9,discard_one:8,destroy_one:8}, 'the 93 trigger candidates follow the configured reversal distribution');
 assert.ok(global.VocaluCatalog.songs.filter(c => c.cost === 1).every(c => c.abilities.some(a => a.type === 'draw_one')), 'every one-cost song draws one card on entry');
 assert.ok(global.VocaluCatalog.songs.filter(c => c.cost >= 6).every(c => c.abilities && c.abilities.length), 'all high-cost songs have an ability');
 assert.ok(global.VocaluCatalog.songs.filter(c => c.cost >= 6).every(c => c.trigger && c.trigger.type), 'all high-cost songs have a life trigger');
-assert.deepEqual([...new Set(global.VocaluCatalog.songs.filter(c => c.cost >= 6).map(c => c.trigger.type))].sort(), ['conditional_play','draw_one','stop_attacks'].sort(), 'high-cost songs use three trigger patterns instead of only free entry');
-assert.ok(global.VocaluCatalog.songs.filter(c => c.cost > 1 && c.cost < 6).every(c => !c.abilities.length), 'mid-cost songs do not receive high-cost abilities');
+assert.deepEqual([...new Set(global.VocaluCatalog.songs.filter(c => c.cost >= 6).map(c => c.trigger.type))].sort(), ['conditional_play','draw_one','stop_attacks','heal_one'].sort(), 'high-cost songs distribute several reversal trigger patterns');
+assert.ok(global.VocaluCatalog.songs.filter(c => c.cost >= 3 && c.cost <= 6).every(c => c.abilities.length === 1), 'every mid-cost song has one configured entry ability');
 assert.deepEqual(global.VocaluCatalog.songs.reduce((a,c)=>(a[c.rarity]=(a[c.rarity]||0)+1,a),{}), {N:100,R:80,SR:45,UR:15});
 assert.deepEqual(global.VocaluCatalog.producers.reduce((a,c)=>(a[c.rarity]=(a[c.rarity]||0)+1,a),{}), {N:4,R:6,SR:6,UR:4});
 assert.deepEqual(global.VocaluCatalog.singers.reduce((a,c)=>(a[c.rarity]=(a[c.rarity]||0)+1,a),{}), {N:16,R:12,SR:8,UR:4});
@@ -72,6 +72,13 @@ E.endTurn(secondPlayerOpening,'cpu');
 E.endTurn(secondPlayerOpening,'user');
 assert.equal(secondPlayerOpening.cpu.hand.length,5,'second player draws only one card on later turns');
 assert.equal(secondPlayerOpening.cpu.maxCost,3,'second-player cost increases normally after the opening bonus');
+E.endTurn(secondPlayerOpening,'cpu');
+E.endTurn(secondPlayerOpening,'user');
+assert.equal(secondPlayerOpening.cpu.maxCost,4,'second player keeps the +1 maximum cost bonus on its third turn');
+E.endTurn(secondPlayerOpening,'cpu');
+E.endTurn(secondPlayerOpening,'user');
+assert.equal(secondPlayerOpening.cpu.maxCost,4,'second player returns to the normal curve on its fourth turn');
+assert.equal(secondPlayerOpening.cpu.cost,4,'fourth-turn available cost does not incorrectly become five');
 const mulliganBattle = E.makeBattle(deck, deck, () => 0.2);
 E.mulligan(mulliganBattle,[0,2],() => 0.8);
 assert.equal(mulliganBattle.user.hand.length,3,'mulligan redraws the number returned');
@@ -260,8 +267,16 @@ assert.ok(E.effectivePower(producerPower.user.field[0]) > baseProducerPower,'pro
 E.endTurn(producerPower,'user');
 assert.equal(E.effectivePower(producerPower.user.field[0]),baseProducerPower,'producer power support expires at end of turn');
 
+const creatorSynergy = E.makeBattle(strongDeck, weakDeck, () => 0.1);
+const linkedProducer = global.VocaluCatalog.producers[0];
+creatorSynergy.user.field = [{...strongDeck[0],producer:linkedProducer.name,currentPower:3000,turnPowerBonus:0,attacked:false}];
+creatorSynergy.user.hand = [{...linkedProducer}];
+const linkedPowerBefore = E.effectivePower(creatorSynergy.user.field[0]);
+E.playCard(creatorSynergy,'user',0,0);
+assert.equal(E.effectivePower(creatorSynergy.user.field[0]),linkedPowerBefore+global.VocaluCatalog.balanceConfig.creatorSynergyPower,'producer strengthens its own linked song through shared support resolution');
+
 function makeTriggerBattle(type) {
-  const support = global.VocaluCatalog.cards.find(c => c.type !== 'song' && c.trigger && c.trigger.type === type);
+  const support = global.VocaluCatalog.cards.find(c => c.trigger && c.trigger.type === type);
   const state = E.makeBattle(strongDeck, weakDeck, () => 0.1);
   state.cpu.life = 2;
   state.cpu.lifeCards = [{...support}];
@@ -286,6 +301,15 @@ assert.equal(destroyTrigger.user.field.some(c => c.currentPower === 9000),false,
 const healTrigger = makeTriggerBattle('heal_one');
 assert.equal(healTrigger.cpu.life,2,'heal trigger restores one life after damage');
 assert.equal(healTrigger.cpu.lifeCards.length,1,'heal trigger places a deck card into life');
+
+const finalHealBattle = E.makeBattle(strongDeck, weakDeck, () => 0.1);
+finalHealBattle.cpu.life = 1;
+finalHealBattle.cpu.lifeCards = [{...global.VocaluCatalog.cards.find(c => c.trigger && c.trigger.type === 'heal_one')}];
+finalHealBattle.user.field = [{...strongDeck[0],currentPower:9000,attacked:false}];
+E.attack(finalHealBattle,'user',0,'life',null,null);
+assert.equal(finalHealBattle.cpu.life,1,'final-life heal trigger resolves after damage and restores one life');
+assert.equal(finalHealBattle.winner,null,'winner is decided only after the final-life trigger finishes');
+assert.equal(finalHealBattle.lastTrigger.type,'heal_one','final-life trigger remains visible to the UI');
 
 const awakenBattle = E.makeBattle(strongDeck, weakDeck, () => 0.1);
 E.setLeaders(awakenBattle,'teto','miku');
@@ -376,6 +400,15 @@ assert.equal(drawBattle.user.hand.length,1,'draw-one ability replaces the played
 assert.equal(drawBattle.user.deck.length,drawDeckBefore-1,'draw-one ability consumes the top deck card');
 assert.equal(drawBattle.lastImpact.type,'entry','high-cost songs expose the entry animation state');
 assert.equal(drawBattle.lastMotion.type,'summon','song play exposes a summon motion event');
+
+const midCostBattle = E.makeBattle(strongDeck, weakDeck, () => 0.1);
+const midCostSong = global.VocaluCatalog.songs.find(c => c.cost === 5 && c.abilities.some(a => a.type === 'power_one'));
+midCostBattle.user.cost = 10;
+midCostBattle.user.maxCost = 10;
+midCostBattle.user.field = [{...strongDeck[0],currentPower:3000,turnPowerBonus:0,attacked:false}];
+midCostBattle.user.hand = [{...midCostSong}];
+E.playCard(midCostBattle,'user',0,0);
+assert.ok(midCostBattle.user.field.some(card => card.turnPowerBonus >= 1000),'mid-cost entry ability immediately changes the board power');
 
 const readyBattle = E.makeBattle(strongDeck, weakDeck, () => 0.1);
 readyBattle.user.cost = 10;
