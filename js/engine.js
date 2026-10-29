@@ -245,7 +245,7 @@
       state.log.unshift('重音テト「REPEAT BEAT」· POWER +' + tetoBonus + (p.leaderAwakened ? ' · AWAKEN' : ''));
     }
     var attackPower = effectivePower(attacker);
-    state.lastMotion = { type: 'attack', side: side, attackerIndex: attackerIndex, targetType: targetType, targetIndex: targetIndex };
+    state.lastMotion = { type: 'attack', side: side, attackerIndex: attackerIndex, targetType: targetType, targetIndex: targetIndex, cardId: attacker.id, cardName: attacker.name, power: attackPower, targetName: targetType === 'song' && enemy.field[targetIndex] ? enemy.field[targetIndex].name : 'LIFE' };
     attacker.attacked = true;
     state.phase = 'attack';
     if (targetType === 'song') {
