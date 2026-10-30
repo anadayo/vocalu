@@ -264,7 +264,10 @@
   }
   function lifeRail(player,side,damageSide){
     var name=side==='cpu'?'CPU':'YOU',leader=leaderInfo(player.leader),awake=player.leaderAwakened,damaged=damageSide===side;
-    return '<div class="life-rail ' + side + '"><div class="rail-player"><b>' + name + '</b><span><i class="mini-leek"></i>' + player.cost + '/' + player.maxCost + '</span></div><div class="leader-skin leader-' + leader.id + ' ' + (awake?'awakened ':'') + (damaged?'damaged ':'') + '" data-leader-skin="' + side + '"><div class="leader-aura"><i></i><i></i><i></i></div><div class="leader-art">' + (leader.image?'<img src="' + esc(leader.image) + '" alt="' + esc(leader.name) + '">':'<span>' + esc(leader.name.slice(0,1)) + '</span>') + '</div><div class="leader-name"><small>LEADER</small><b>' + esc(leader.name) + '</b></div>' + (awake?'<em>AWAKEN</em>':'') + '<i class="damage-burst"></i></div>' + lifeCards(player,side) + '</div>';
+    var playerHtml='<div class="rail-player"><b>' + name + '</b><span><i class="mini-leek"></i>' + player.cost + '/' + player.maxCost + '</span></div>';
+    var leaderHtml='<div class="leader-skin leader-' + leader.id + ' ' + (awake?'awakened ':'') + (damaged?'damaged ':'') + '" data-leader-skin="' + side + '"><div class="leader-aura"><i></i><i></i><i></i></div><div class="leader-art">' + (leader.image?'<img src="' + esc(leader.image) + '" alt="' + esc(leader.name) + '">':'<span>' + esc(leader.name.slice(0,1)) + '</span>') + '</div><div class="leader-name"><small>LEADER</small><b>' + esc(leader.name) + '</b></div>' + (awake?'<em>AWAKEN</em>':'') + '<i class="damage-burst"></i></div>';
+    var lifeHtml=lifeCards(player,side);
+    return '<div class="life-rail ' + side + '">' + (side==='cpu'?lifeHtml+leaderHtml+playerHtml:playerHtml+leaderHtml+lifeHtml) + '</div>';
   }
   function handHtml(card,i,total,userActive,cost) {
     var offset=i-(total-1)/2,angle=Math.max(-9,Math.min(9,offset*3)),lift=Math.min(14,Math.abs(offset)*4),unavailable=!userActive||(card.cost||0)>cost;
