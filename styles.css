@@ -143,3 +143,14 @@
 .leader-teto .leader-art img{object-position:center 8%}
 .life-rail.cpu .rail-player{margin-top:1px}
 .life-rail.cpu .digital-life-target{margin-bottom:1px}
+
+/* Player-selected single-target skills. */
+.battle-slot.skill-targetable{z-index:4;filter:none;opacity:1}
+.battle-slot.skill-targetable .slot-card{outline:2px solid #ffe27a;outline-offset:2px;filter:drop-shadow(0 0 12px #ffd65c);animation:skillTargetPulse .8s ease-in-out infinite alternate}
+.skill-target-guide{border-color:#ffe27a;background:#28220d;color:#ffeaa0}
+.skill-choice-panel{border-left-color:#ffe27a}
+.skill-choice-heading{display:grid;gap:3px;padding:10px;border:1px solid #77631d;background:#27210d}
+.skill-choice-heading span{color:#ffe27a;font-size:8px;font-weight:900}
+.skill-choice-heading b{font-size:13px}
+.skill-choice-heading small,.skill-choice-actions p{color:#e9dfb6;font-size:9px}
+@keyframes skillTargetPulse{to{transform:translateY(-3px) scale(1.025);filter:drop-shadow(0 0 20px #ffd65c)}}

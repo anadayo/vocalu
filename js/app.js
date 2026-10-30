@@ -229,7 +229,8 @@
     VocaluEngine.setLeaders(state.battle,state.leaderChoice,state.leaderChoice==='miku'?'teto':'miku');
     state.battle.user.cost=10; state.battle.user.maxCost=10; state.battle.user.life=2;
     var highCost=VocaluCatalog.songs.find(function(card){return card.cost>=6&&card.abilities&&card.abilities.length;});
-    state.battle.user.hand=[VocaluCatalog.songs[0],highCost,VocaluCatalog.singers.find(function(card){return card.trigger;}),VocaluCatalog.producers.find(function(card){return card.trigger;})];
+    var targetSkillSong=VocaluCatalog.songs.find(function(card){return (card.abilities||[]).some(function(ability){return ability.type==='power_one';});});
+    state.battle.user.hand=[VocaluCatalog.songs[0],highCost,targetSkillSong,VocaluCatalog.singers.find(function(card){return card.trigger;}),VocaluCatalog.producers.find(function(card){return card.trigger;})];
     VocaluEngine.playCard(state.battle,'user',0,0);
     state.battle.user.field[0].attacked=false;
     state.selectedUnit=null; state.targeting=null; state.pendingAttack=null; state.screen='battle'; render();
@@ -244,8 +245,9 @@
     var selected=state.selectedUnit&&state.selectedUnit.side===side&&state.selectedUnit.index===index;
     var target=side==='cpu'&&state.targeting!=null&&song.attacked;
     var incoming=state.pendingAttack&&((side==='cpu'&&state.pendingAttack.attackerIndex===index)||(side==='user'&&state.pendingAttack.targetType==='song'&&state.pendingAttack.targetIndex===index));
+    var skillTarget=state.battle&&state.battle.pendingPowerChoice&&state.battle.pendingPowerChoice.side==='user'&&side==='user';
     var motionClass=motion&&motion.side===side&&motion.index===index?(motion.type==='summon'?'summon-motion ':motion.type==='equip'?'equip-motion ':''):'';
-    return '<div class="battle-slot ' + motionClass + (selected?'selected ':'') + (target?'targetable ':'') + (incoming?(side==='cpu'?'attacking ':'under-attack '):'') + (song.attacked?'used':'') + '"><button class="slot-card" data-action="select-unit" data-side="' + side + '" data-index="' + index + '">' + cardFace(song,true) + '</button><button class="inspect" data-action="battle-detail" data-side="' + side + '" data-index="' + index + '" aria-label="詳細">⌕</button></div>';
+    return '<div class="battle-slot ' + motionClass + (selected?'selected ':'') + (target?'targetable ':'') + (skillTarget?'skill-targetable ':'') + (incoming?(side==='cpu'?'attacking ':'under-attack '):'') + (song.attacked?'used':'') + '"><button class="slot-card" data-action="select-unit" data-side="' + side + '" data-index="' + index + '">' + cardFace(song,true) + '</button><button class="inspect" data-action="battle-detail" data-side="' + side + '" data-index="' + index + '" aria-label="詳細">⌕</button></div>';
   }
   function lifeCards(player,side) { var cells='';for(var i=0;i<5;i+=1)cells+='<i class="life-cell ' + (i<player.life?'filled':'broken') + '"><span></span></i>';var incoming=side==='user'&&state.pendingAttack&&state.pendingAttack.targetType==='life';return '<button class="life-target digital-life-target ' + (side==='cpu'&&state.targeting!=null?'targetable ':'') + (incoming?'under-attack ':'') + '" ' + (side==='cpu'&&state.targeting!=null?'data-action="attack-life"':'disabled') + '><span class="life-readout"><small>LIFE</small><b>' + player.life + '</b><em>/5</em></span><span class="life-cells">' + cells + '</span></button>'; }
   function pileHtml(player,side){
@@ -276,6 +278,8 @@
   function selectedCard() { if(!state.selectedUnit||!state.battle)return null;return state.battle[state.selectedUnit.side].field[state.selectedUnit.index]||null; }
   function actionPanel() {
     var card=selectedCard(), tabs='<div class="panel-tabs"><button data-action="panel-tab" data-tab="action" class="' + (state.panelTab==='action'?'active':'') + '">ACTION</button><button data-action="panel-tab" data-tab="detail" class="' + (state.panelTab==='detail'?'active':'') + '">DETAIL</button><button data-action="panel-tab" data-tab="log" class="' + (state.panelTab==='log'?'active':'') + '">LOG</button></div>',body='';
+    var powerChoice=state.battle.pendingPowerChoice;
+    if(powerChoice&&powerChoice.side==='user')return '<aside class="action-panel skill-choice-panel"><div class="skill-choice-heading"><span>SELECT TARGET</span><b>' + esc(powerChoice.label) + '</b><small>自分の楽曲1枚まで · このターン POWER +' + powerChoice.amount + '</small></div><div class="panel-body skill-choice-actions"><p>盤面の光っている楽曲をタップしてください。</p><button class="secondary" data-action="skip-power-choice">選ばない</button></div></aside>';
     if(state.pendingAttack){
       var pending=state.pendingAttack,attacker=state.battle.cpu.field[pending.attackerIndex],target=pending.targetType==='song'?state.battle.user.field[pending.targetIndex]:null;
       var decisions='<button class="primary" data-action="resolve-cpu-attack" data-attacker="' + pending.attackerIndex + '" data-target="' + pending.targetType + '" data-target-index="' + (pending.targetIndex==null?'':pending.targetIndex) + '" data-guard="none">' + (target?'この楽曲で受ける':'ライフで受ける') + '</button>';
@@ -293,7 +297,8 @@
     var cpuSlots=[0,1,2].map(function(i){return slotHtml(c.field[i],i,'cpu',motion);}).join('');
     var userSlots=[0,1,2].map(function(i){return slotHtml(u.field[i],i,'user',motion);}).join('');
     var hand=u.hand.map(function(card,i){return handHtml(card,i,u.hand.length,userActive,u.cost);}).join('');
-    var targeting=state.targeting!=null?'<div class="target-guide">指・カーソルへ攻撃ラインが追従 · 対象をタップ<button data-action="cancel-action">取消</button></div><div class="attack-trail" data-attack-trail><i></i></div>':state.pendingAttack?'<div class="target-guide incoming-guide">CPUから攻撃中 · 点線の攻撃先を確認して防御を選択<span class="attack-arrow">↓</span></div><div class="attack-trail cpu-attack-trail" data-cpu-attack-trail><i></i></div>':'';
+    var powerChoice=b.pendingPowerChoice&&b.pendingPowerChoice.side==='user'?'<div class="target-guide skill-target-guide">強化する自分の楽曲を選択 · POWER +' + b.pendingPowerChoice.amount + '<button data-action="skip-power-choice">選ばない</button></div>':'';
+    var targeting=powerChoice||(state.targeting!=null?'<div class="target-guide">指・カーソルへ攻撃ラインが追従 · 対象をタップ<button data-action="cancel-action">取消</button></div><div class="attack-trail" data-attack-trail><i></i></div>':state.pendingAttack?'<div class="target-guide incoming-guide">CPUから攻撃中 · 点線の攻撃先を確認して防御を選択<span class="attack-arrow">↓</span></div><div class="attack-trail cpu-attack-trail" data-cpu-attack-trail><i></i></div>':'');
     var impactLabels={life:'LIFE BREAK',knockout:'KNOCKOUT',clash:'DOUBLE DROP',entry:'HIGH COST ENTRY',encore:'ENCORE ATTACK',tagteam:'TAG TEAM'};
     var impactPieces='<i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>';
     var impactHtml=impact?'<div class="impact-effect ' + impact.type + '"><span class="impact-core"></span><span class="impact-shards">'+impactPieces+'</span><b>' + esc(impact.label||impactLabels[impact.type]||'IMPACT') + '</b></div>':leaderAwaken?'<div class="impact-effect leader-awaken"><span class="awaken-rings"><i></i><i></i><i></i></span><b><small>'+esc(leaderInfo(leaderAwaken.leader).name)+'</small>AWAKEN</b></div>':'';
@@ -450,7 +455,8 @@
     else if(action==='play')playFromHand(Number(button.dataset.index));
     else if(action==='hand-detail'){var handCard=state.battle.user.hand[Number(button.dataset.index)];if(handCard)choose(handCard.name,detailContent(handCard));}
     else if(action==='replace-play'||action==='equip-play'){button.closest('.modal').remove();lockBattleInput();VocaluEngine.playCard(state.battle,'user',Number(button.dataset.hand),Number(button.dataset.index));render();}
-    else if(action==='select-unit'){var side=button.dataset.side,index=Number(button.dataset.index);if(side==='cpu'&&state.targeting!=null&&state.battle.cpu.field[index].attacked)resolveUserAttack('song',index);else if(side==='cpu'&&state.targeting!=null)toast('ACTIVE状態の楽曲は攻撃対象にできません');else{state.selectedUnit={side:side,index:index};state.panelTab='action';state.targeting=side==='user'&&state.battle.active==='user'&&!state.battle.user.field[index].attacked?index:null;render();}}
+    else if(action==='select-unit'){var side=button.dataset.side,index=Number(button.dataset.index);if(state.battle.pendingPowerChoice&&state.battle.pendingPowerChoice.side==='user'&&side==='user'){VocaluEngine.resolvePowerChoice(state.battle,'user',index);state.selectedUnit=null;state.panelTab='log';render();}else if(side==='cpu'&&state.targeting!=null&&state.battle.cpu.field[index].attacked)resolveUserAttack('song',index);else if(side==='cpu'&&state.targeting!=null)toast('ACTIVE状態の楽曲は攻撃対象にできません');else{state.selectedUnit={side:side,index:index};state.panelTab='action';state.targeting=side==='user'&&state.battle.active==='user'&&!state.battle.user.field[index].attacked?index:null;render();}}
+    else if(action==='skip-power-choice'){VocaluEngine.resolvePowerChoice(state.battle,'user',null);state.selectedUnit=null;state.panelTab='log';render();}
     else if(action==='attack-life')resolveUserAttack('life',null);
     else if(action==='cancel-action'){state.targeting=null;state.selectedUnit=null;state.panelTab='log';render();}
     else if(action==='panel-tab'){state.panelTab=button.dataset.tab;render();}

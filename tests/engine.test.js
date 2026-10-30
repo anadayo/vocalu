@@ -267,6 +267,18 @@ assert.ok(E.effectivePower(producerPower.user.field[0]) > baseProducerPower,'pro
 E.endTurn(producerPower,'user');
 assert.equal(E.effectivePower(producerPower.user.field[0]),baseProducerPower,'producer power support expires at end of turn');
 
+const producerTarget = E.makeBattle(strongDeck, weakDeck, () => 0.1);
+producerTarget.user.cost = 10;
+producerTarget.user.field = [{...strongDeck[0],currentPower:3000,turnPowerBonus:0,attacked:false},{...strongDeck[1],currentPower:4000,turnPowerBonus:0,attacked:false}];
+producerTarget.user.hand = [{...global.VocaluCatalog.producers.find(c => c.abilities.some(a => a.type === 'power_one'))}];
+const unchosenProducerPower = E.effectivePower(producerTarget.user.field[0]);
+const chosenProducerPower = E.effectivePower(producerTarget.user.field[1]);
+E.playCard(producerTarget,'user',0,0);
+assert.equal(producerTarget.pendingPowerChoice.amount,2500,'single-target producer support waits for a player target');
+E.resolvePowerChoice(producerTarget,'user',1);
+assert.equal(E.effectivePower(producerTarget.user.field[0]),unchosenProducerPower,'producer support leaves the unchosen song unchanged');
+assert.equal(E.effectivePower(producerTarget.user.field[1]),chosenProducerPower+2500,'producer support boosts only the chosen song');
+
 const creatorSynergy = E.makeBattle(strongDeck, weakDeck, () => 0.1);
 const linkedProducer = global.VocaluCatalog.producers[0];
 creatorSynergy.user.field = [{...strongDeck[0],producer:linkedProducer.name,currentPower:3000,turnPowerBonus:0,attacked:false}];
@@ -408,7 +420,20 @@ midCostBattle.user.maxCost = 10;
 midCostBattle.user.field = [{...strongDeck[0],currentPower:3000,turnPowerBonus:0,attacked:false}];
 midCostBattle.user.hand = [{...midCostSong}];
 E.playCard(midCostBattle,'user',0,0);
-assert.ok(midCostBattle.user.field.some(card => card.turnPowerBonus >= 1000),'mid-cost entry ability immediately changes the board power');
+assert.equal(midCostBattle.pendingPowerChoice.amount,1000,'single-target entry ability waits for the player to choose a target');
+assert.throws(() => E.endTurn(midCostBattle,'user'),/対象を選んで/,'turn cannot end while a required skill choice is open');
+const chosenPowerBefore = E.effectivePower(midCostBattle.user.field[0]);
+E.resolvePowerChoice(midCostBattle,'user',0);
+assert.equal(E.effectivePower(midCostBattle.user.field[0]),chosenPowerBefore+1000,'chosen song receives the entry power bonus');
+assert.equal(midCostBattle.pendingPowerChoice,null,'single-target choice closes after resolution');
+
+const optionalChoiceBattle = E.makeBattle(strongDeck, weakDeck, () => 0.1);
+optionalChoiceBattle.user.cost = 10;
+optionalChoiceBattle.user.field = [{...strongDeck[0],currentPower:3000,turnPowerBonus:0,attacked:false}];
+optionalChoiceBattle.user.hand = [{...midCostSong}];
+E.playCard(optionalChoiceBattle,'user',0,0);
+E.resolvePowerChoice(optionalChoiceBattle,'user',null);
+assert.equal(optionalChoiceBattle.user.field[0].turnPowerBonus,0,'up to one target allows the player to choose no song');
 
 const readyBattle = E.makeBattle(strongDeck, weakDeck, () => 0.1);
 readyBattle.user.cost = 10;

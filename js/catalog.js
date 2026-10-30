@@ -148,12 +148,12 @@
       { type:'draw_one', label:'セットリスト', text:'登場時、デッキからカードを1枚引く。' }
     ],
     4: [
-      { type:'power_one', amount:500, label:'テンポアップ', text:'登場時、このターン自分の楽曲1枚をPOWER +500。' },
+      { type:'power_one', amount:500, label:'テンポアップ', text:'登場時、自分の楽曲1枚までを選び、このターンPOWER +500。' },
       { type:'ensemble', amount:500, label:'アンサンブル', text:'登場時、ほかの自分の楽曲があれば、このターン自身をPOWER +500。' }
     ],
     5: [
       { type:'draw_one', label:'アンコール・ドロー', text:'登場時、デッキからカードを1枚引く。' },
-      { type:'power_one', amount:1000, label:'リミックス', text:'登場時、このターン自分の楽曲1枚をPOWER +1000。' }
+      { type:'power_one', amount:1000, label:'リミックス', text:'登場時、自分の楽曲1枚までを選び、このターンPOWER +1000。' }
     ],
     6: [
       { type:'ensemble', amount:1000, label:'フルアンサンブル', text:'登場時、ほかの自分の楽曲があれば、このターン自身をPOWER +1000。' },
@@ -186,7 +186,7 @@
     var patterns = [
       [{ type:'draw_cards', count:2, label:'クリエイターズ・ドロー', text:'カードを2枚引く。' }],
       [{ type:'power_all', amount:1000, label:'フルミックス', text:'このターン、自分の楽曲すべてをPOWER +1000。' }],
-      [{ type:'power_one', amount:2500, label:'スポットライト', text:'このターン、自分の楽曲1枚をPOWER +2500。' }],
+      [{ type:'power_one', amount:2500, label:'スポットライト', text:'自分の楽曲1枚までを選び、このターンPOWER +2500。' }],
       [
         { type:'draw_cards', count:1, label:'デモテープ', text:'カードを1枚引く。' },
         { type:'power_all', amount:500, label:'マスタリング', text:'このターン、自分の楽曲すべてをPOWER +500。' }

@@ -78,7 +78,7 @@
       var lifeCards = deck.splice(0, 5);
       return { life: 5, lifeCards: lifeCards, deck: deck, hand: hand, field: [], discard: [], maxCost: 0, cost: 0, producerUsed: false, leader: null, leaderAwakened: false, leaderSkillUsed: false, goingSecond: goingSecond, firstTurnStarted: false, turnsStarted: 0 };
     }
-    var state = { turn: 0, active: 'user', phase: 'main', winner: null, actionCount: 0, log: [], mulliganUsed: false, lastImpact: null, lastLifeTransfer: null, lastMotion: null, lastLeaderSkill: null, rules: Object.assign({},DEFAULT_RULES,rules||{}) };
+    var state = { turn: 0, active: 'user', phase: 'main', winner: null, actionCount: 0, log: [], mulliganUsed: false, lastImpact: null, lastLifeTransfer: null, lastMotion: null, lastLeaderSkill: null, pendingPowerChoice: null, rules: Object.assign({},DEFAULT_RULES,rules||{}) };
     state.user = player(deckCards, 3, false);
     state.cpu = player(cpuCards, 2, true);
     startTurn(state, 'user', false);
@@ -134,6 +134,7 @@
 
   function playCard(state, side, handIndex, replaceIndex) {
     ensureTurn(state, side);
+    ensureChoiceResolved(state, side);
     var p = state[side];
     var card = p.hand[handIndex];
     if (!card) throw new Error('カードが見つかりません');
@@ -175,8 +176,7 @@
         } else if (ability.type === 'power_all') {
           p.field.forEach(function (song) { song.turnPowerBonus = (song.turnPowerBonus || 0) + (ability.amount || 0); });
         } else if (ability.type === 'power_one' && p.field.length) {
-          var powerTarget = p.field[highestPowerIndex(p.field)];
-          powerTarget.turnPowerBonus = (powerTarget.turnPowerBonus || 0) + (ability.amount || 0);
+          queuePowerChoice(state, side, ability, card.name);
         } else if (ability.type === 'reveal_top_cost_song' && p.deck.length) {
           var revealed = p.deck.shift();
           if (revealed.type === 'song' && (revealed.cost || 0) <= (ability.maxCost || 1)) {
@@ -226,6 +226,7 @@
 
   function attack(state, side, attackerIndex, targetType, targetIndex, guardIndex) {
     ensureTurn(state, side);
+    ensureChoiceResolved(state, side);
     var p = state[side];
     var enemy = state[side === 'user' ? 'cpu' : 'user'];
     var attacker = p.field[attackerIndex];
@@ -379,7 +380,7 @@
     (song.abilities||[]).forEach(function(ability){
       if(ability.type==='draw_one')drawCards(p,1);
       else if(ability.type==='power_self')song.turnPowerBonus=(song.turnPowerBonus||0)+(ability.amount||0);
-      else if(ability.type==='power_one'&&p.field.length){var target=p.field[highestPowerIndex(p.field)];target.turnPowerBonus=(target.turnPowerBonus||0)+(ability.amount||0);}
+      else if(ability.type==='power_one'&&p.field.length)queuePowerChoice(state,side,ability,song.name);
       else if(ability.type==='ensemble'&&p.field.length>1)song.turnPowerBonus=(song.turnPowerBonus||0)+(ability.amount||0);
       else return;
       state.log.unshift(song.name+'「'+ability.label+'」· '+ability.text);
@@ -396,6 +397,37 @@
       if (effectivePower(field[i]) > effectivePower(field[highestPower])) highestPower = i;
     }
     return highestPower;
+  }
+
+  function queuePowerChoice(state,side,ability,sourceName){
+    var player=state[side];
+    if(!player.field.length)return false;
+    if(side==='cpu'){
+      var autoTarget=player.field[highestPowerIndex(player.field)];
+      autoTarget.turnPowerBonus=(autoTarget.turnPowerBonus||0)+(ability.amount||0);
+      state.log.unshift(sourceName+'「'+ability.label+'」· '+autoTarget.name+'をPOWER +'+(ability.amount||0));
+      return true;
+    }
+    state.pendingPowerChoice={side:side,amount:ability.amount||0,label:ability.label,sourceName:sourceName};
+    state.log.unshift(sourceName+'「'+ability.label+'」· 強化する楽曲を選択');
+    return true;
+  }
+
+  function resolvePowerChoice(state,side,targetIndex){
+    ensureTurn(state,side);
+    var choice=state.pendingPowerChoice;
+    if(!choice||choice.side!==side)throw new Error('選択中のスキルがありません');
+    if(targetIndex!=null){
+      var target=state[side].field[targetIndex];
+      if(!target)throw new Error('強化する楽曲を選んでください');
+      target.turnPowerBonus=(target.turnPowerBonus||0)+choice.amount;
+      state.log.unshift(choice.sourceName+'「'+choice.label+'」· '+target.name+'をPOWER +'+choice.amount);
+    }else{
+      state.log.unshift(choice.sourceName+'「'+choice.label+'」· 対象を選ばず終了');
+    }
+    state.pendingPowerChoice=null;
+    bump(state);
+    return state;
   }
 
   function readyAfterKnockout(state, side, attacker) {
@@ -424,6 +456,7 @@
 
   function endTurn(state, side) {
     ensureTurn(state, side);
+    ensureChoiceResolved(state, side);
     if (state.winner) return state;
     state[side].field.forEach(function (song) { song.turnPowerBonus = 0; });
     startTurn(state, side === 'user' ? 'cpu' : 'user', true);
@@ -498,6 +531,9 @@
     if (state.winner) throw new Error('対戦は終了しています');
     if (state.active !== side) throw new Error('現在のターンではありません');
   }
+  function ensureChoiceResolved(state,side){
+    if(state.pendingPowerChoice&&state.pendingPowerChoice.side===side)throw new Error('スキルの対象を選んでください');
+  }
   function bump(state) { state.actionCount += 1; if (state.actionCount > 500) throw new Error('安全のため対戦を停止しました'); validate(state); }
   function validate(state) {
     ['user', 'cpu'].forEach(function (side) {
@@ -507,5 +543,5 @@
     return true;
   }
 
-  return { RARITY_WEIGHTS: RARITY_WEIGHTS, DEFAULT_RULES: DEFAULT_RULES, openPack: openPack, openFivePacks: openFivePacks, autoBuild: autoBuild, makeBattle: makeBattle, setLeaders: setLeaders, mulligan: mulligan, playCard: playCard, attack: attack, endTurn: endTurn, cpuMainPhase: cpuMainPhase, cpuTurn: cpuTurn, effectivePower: effectivePower, rankDifficulty: rankDifficulty, validate: validate };
+  return { RARITY_WEIGHTS: RARITY_WEIGHTS, DEFAULT_RULES: DEFAULT_RULES, openPack: openPack, openFivePacks: openFivePacks, autoBuild: autoBuild, makeBattle: makeBattle, setLeaders: setLeaders, mulligan: mulligan, playCard: playCard, resolvePowerChoice: resolvePowerChoice, attack: attack, endTurn: endTurn, cpuMainPhase: cpuMainPhase, cpuTurn: cpuTurn, effectivePower: effectivePower, rankDifficulty: rankDifficulty, validate: validate };
 }));
