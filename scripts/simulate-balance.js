@@ -9,7 +9,8 @@ const E = require('../js/engine.js');
 
 const C = global.VocaluCatalog;
 const GAMES = Math.max(100, Number(process.argv[2]) || 10000);
-const OUT = path.join(__dirname, '..', 'reports', 'vocalu-balance-2026-10-29.md');
+const RUN_DATE = new Intl.DateTimeFormat('sv-SE', {timeZone:'Asia/Tokyo', year:'numeric', month:'2-digit', day:'2-digit'}).format(new Date());
+const OUT = path.join(__dirname, '..', 'reports', `vocalu-balance-${RUN_DATE}.md`);
 
 function seeded(seed) {
   let value = seed >>> 0;
@@ -156,7 +157,7 @@ const descriptions = {
 const results = ['A','B','C','D','E'].map(name => ({name,metrics:simulateVariant(name, 20261029)}));
 const lines = [
   '# VOCALU バランスシミュレーション', '',
-  `- 実行日: 2026-10-29`, `- 各条件: ${GAMES.toLocaleString('ja-JP')}試合`, '- 固定シード・同一AI強度・20枚デッキ・ライフ5', '',
+  `- 実行日: ${RUN_DATE}`, `- 各条件: ${GAMES.toLocaleString('ja-JP')}試合`, '- 固定シード・同一AI強度・20枚デッキ・ライフ5', '',
   '|条件|内容|先攻勝率|後攻勝率|平均決着ターン|3ターン以内|逆転勝利|停止|エラー|コスト使用率|サポート/試合|',
   '|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|'
 ];

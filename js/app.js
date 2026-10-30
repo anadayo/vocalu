@@ -255,7 +255,7 @@
   function compactHand(player,side){
     var cards='';
     if(side==='cpu')for(var i=0;i<Math.min(3,player.hand.length);i+=1)cards+='<i class="hidden-hand-card" style="--hidden-index:' + i + '">V</i>';
-    return '<div class="compact-hand ' + side + '-hand"><span>HAND</span><b>' + player.hand.length + '</b>' + (cards?'<div class="opponent-hand-stack">' + cards + '<strong>×' + player.hand.length + '</strong></div>':'<div class="opponent-hand-stack empty"><strong>×0</strong></div>') + '</div>';
+    return '<div class="compact-hand ' + side + '-hand"><span>HAND</span>' + (cards?'<div class="opponent-hand-stack">' + cards + '<strong>×' + player.hand.length + '</strong></div>':'<div class="opponent-hand-stack empty"><strong>×0</strong></div>') + '</div>';
   }
   function playerStrip(player,side){
     var name=side==='cpu'?'STUDIO CPU':'YOU',label=side==='cpu'?'OPPONENT':'PLAYER';
@@ -263,7 +263,7 @@
   }
   function lifeRail(player,side,damageSide){
     var name=side==='cpu'?'CPU':'YOU',leader=leaderInfo(player.leader),awake=player.leaderAwakened,damaged=damageSide===side;
-    return '<div class="life-rail ' + side + '"><div class="rail-player"><b>' + name + '</b><span><i class="mini-leek"></i>' + player.cost + '/' + player.maxCost + '</span></div><div class="leader-skin ' + (awake?'awakened ':'') + (damaged?'damaged ':'') + '" data-leader-skin="' + side + '"><div class="leader-art">' + (leader.image?'<img src="' + esc(leader.image) + '" alt="' + esc(leader.name) + '">':'<span>' + esc(leader.name.slice(0,1)) + '</span>') + '</div><div class="leader-name"><small>LEADER</small><b>' + esc(leader.name) + '</b></div>' + (awake?'<em>AWAKEN</em>':'') + '<i class="damage-burst"></i></div>' + lifeCards(player,side) + '</div>';
+    return '<div class="life-rail ' + side + '"><div class="rail-player"><b>' + name + '</b><span><i class="mini-leek"></i>' + player.cost + '/' + player.maxCost + '</span></div><div class="leader-skin leader-' + leader.id + ' ' + (awake?'awakened ':'') + (damaged?'damaged ':'') + '" data-leader-skin="' + side + '"><div class="leader-aura"><i></i><i></i><i></i></div><div class="leader-art">' + (leader.image?'<img src="' + esc(leader.image) + '" alt="' + esc(leader.name) + '">':'<span>' + esc(leader.name.slice(0,1)) + '</span>') + '</div><div class="leader-name"><small>LEADER</small><b>' + esc(leader.name) + '</b></div>' + (awake?'<em>AWAKEN</em>':'') + '<i class="damage-burst"></i></div>' + lifeCards(player,side) + '</div>';
   }
   function handHtml(card,i,total,userActive,cost) {
     var offset=i-(total-1)/2,angle=Math.max(-9,Math.min(9,offset*3)),lift=Math.min(14,Math.abs(offset)*4),unavailable=!userActive||(card.cost||0)>cost;
@@ -305,9 +305,9 @@
     var finaleHtml=b.finishQueued?'<div class="finale-motion motion-overlay '+b.winner+'"><span></span><i></i><b>FINAL BEAT</b><small>'+(b.winner==='user'?'LIVE CLEAR':'LIVE FAILED')+'</small></div>':'';
     var damageSide=impact&&impact.type==='life'?impact.side:null;
     var board='<section class="battle-center"><header class="battle-status"><span>TURN ' + b.turn + '</span><b class="' + (userActive?'user-turn':'cpu-turn') + '">' + (userActive?'YOUR TURN':'CPU TURN') + '</b><span>' + difficultyName() + '</span></header>' + targeting
-      + '<div class="battle-zone player-row enemy mirrored">' + pileHtml(c,'cpu') + '<div class="battle-core">' + compactHand(c,'cpu') + '<div class="battle-field enemy-field">' + cpuSlots + '</div></div>' + lifeRail(c,'cpu',damageSide) + '</div>'
+      + '<div class="battle-zone player-row enemy mirrored ' + (!userActive?'is-active':'') + '">' + pileHtml(c,'cpu') + '<div class="battle-core">' + compactHand(c,'cpu') + '<div class="battle-field enemy-field">' + cpuSlots + '</div></div>' + lifeRail(c,'cpu',damageSide) + '</div>'
       + '<div class="stage-line"><span>VOCALU STAGE</span><button class="stage-end-turn" data-action="end-turn" ' + (userActive?'':'disabled') + '>ターン終了</button></div>'
-      + '<div class="battle-zone player-row user">' + lifeRail(u,'user',damageSide) + '<div class="battle-core"><div class="battle-field user-field">' + userSlots + '</div></div>' + pileHtml(u,'user') + '</div>'
+      + '<div class="battle-zone player-row user ' + (userActive?'is-active':'') + '">' + lifeRail(u,'user',damageSide) + '<div class="battle-core"><div class="battle-field user-field">' + userSlots + '</div></div>' + pileHtml(u,'user') + '</div>'
       + (u.life<=2?'<div class="clutch-rule">LIFE 2 OR LESS · 召喚した楽曲はすぐ攻撃可能</div>':'') + '<div class="hand-zone ' + (motion&&motion.type==='turn'&&motion.side==='user'&&motion.drawCount?'draw-motion':'') + '"><div class="hand-label"><b>HAND</b><span>' + u.hand.length + ' CARDS</span></div><div class="hand">' + hand + '</div></div>' + turnHtml + playHtml + attackHtml + leaderSkillHtml + transferHtml + impactHtml + finaleHtml + '</section>';
     app.innerHTML=shell(board+actionPanel(),true);
     if(state.targeting!=null)requestAnimationFrame(resetAttackTrail);
