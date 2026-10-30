@@ -22,6 +22,7 @@
   var yt = null;
   var renderedScreen = null;
   var battleInputLockedUntil = 0;
+  var battleMotionCleanupTimer = null;
 
   function track(name, params) {
     if (!window.VOCALU_ANALYTICS_ENABLED || typeof window.gtag !== 'function') return;
@@ -310,6 +311,13 @@
       + '<div class="battle-zone player-row user ' + (userActive?'is-active':'') + '">' + lifeRail(u,'user',damageSide) + '<div class="battle-core"><div class="battle-field user-field">' + userSlots + '</div></div>' + pileHtml(u,'user') + '</div>'
       + (u.life<=2?'<div class="clutch-rule">LIFE 2 OR LESS · 召喚した楽曲はすぐ攻撃可能</div>':'') + '<div class="hand-zone ' + (motion&&motion.type==='turn'&&motion.side==='user'&&motion.drawCount?'draw-motion':'') + '"><div class="hand-label"><b>HAND</b><span>' + u.hand.length + ' CARDS</span></div><div class="hand">' + hand + '</div></div>' + turnHtml + playHtml + attackHtml + leaderSkillHtml + transferHtml + impactHtml + finaleHtml + '</section>';
     app.innerHTML=shell(board+actionPanel(),true);
+    if(motion||impact||leaderAwaken||lifeTransfer||leaderSkill||b.finishQueued){
+      clearTimeout(battleMotionCleanupTimer);
+      battleMotionCleanupTimer=setTimeout(function(){
+        app.querySelectorAll('.motion-overlay,.life-transfer,.impact-effect').forEach(function(element){element.remove();});
+        app.querySelectorAll('.summon-motion,.equip-motion,.draw-motion').forEach(function(element){element.classList.remove('summon-motion','equip-motion','draw-motion');});
+      },state.light?100:1200);
+    }
     if(state.targeting!=null)requestAnimationFrame(resetAttackTrail);
     if(state.pendingAttack)requestAnimationFrame(updateCpuAttackTrail);
   }

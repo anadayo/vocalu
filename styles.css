@@ -130,5 +130,8 @@
 @media(max-width:430px){.battle-zone{grid-template-columns:50px minmax(0,1fr) 70px!important;gap:4px;margin:1px 0;padding:2px 0}.battle-zone.enemy.mirrored{grid-template-columns:50px minmax(0,1fr) 70px!important}.battle-zone.user{grid-template-columns:70px minmax(0,1fr) 50px!important}.battle-field{gap:2px;max-width:285px}.battle-slot.empty{min-height:62px}.leader-skin{width:66px;height:76px}.digital-life-target{width:66px!important}.pile-zone .pile-card{width:46px;height:38px}.compact-hand.cpu-hand{top:-1px;min-width:74px;grid-template-columns:auto 54px}.opponent-hand-stack{transform:scale(.9);transform-origin:center}.stage-end-turn{width:58px;min-height:32px}.battle-slot .inspect{width:18px;height:18px;font-size:8px}}
 @media(prefers-reduced-motion:reduce){.leader-art img,.leader-aura:before,.leader-aura i{animation:none!important}.leader-aura i{display:none}}body.light-mode .leader-art img,body.light-mode .leader-aura:before,body.light-mode .leader-aura i{animation:none!important}
 
+/* Keep REST cards centered inside their own stage slot on Safari. */
+.battle-slot.used .slot-card{transform:rotate(-90deg) scale(.66);transform-origin:50% 50%}
+
 /* Final playmat polish: open slot markers and upper-body leader framing. */
 .battle-slot.empty{border:0!important;background:radial-gradient(circle at 50% 56%,#81d8d012,transparent 52%)!important}.battle-slot.empty:after{content:"";position:absolute;left:35%;right:35%;bottom:12%;height:1px;background:linear-gradient(90deg,transparent,#81d8d03d,transparent)}.battle-slot.empty span{display:none}.leader-art img{width:180%;height:190%;margin:-5% 0 0 -40%;object-fit:contain;object-position:center top;transform-origin:center 30%}.leader-teto .leader-art img{width:250%;height:260%;margin:-10% 0 0 -75%}
