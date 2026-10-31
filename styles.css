@@ -177,3 +177,4 @@
 @keyframes lifeNumberDrop{0%{transform:scale(1.7);filter:brightness(1.8)}100%{transform:none}}
 @keyframes lifeCellBreak{0%{opacity:1;transform:scale(1.25) rotate(0)}100%{opacity:.2;transform:scale(.65) rotate(18deg)}}
 @media(prefers-reduced-motion:reduce){.leader-skin.targetable,.leader-hit-step,.digital-life-target.life-decreasing .life-readout b,.digital-life-target.life-decreasing .life-cell{animation:none!important}}
+.legal-links{display:flex;justify-content:center;gap:14px;flex-wrap:wrap;margin:18px 0 4px;padding-top:14px;border-top:1px solid var(--line)}.legal-links a{color:var(--muted);font-size:9px;text-decoration:none}.legal-links a:hover,.legal-links a:focus-visible{color:var(--accent)}

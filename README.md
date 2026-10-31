@@ -48,4 +48,8 @@ python3 -m http.server 3345
 
 ```sh
 node tests/engine.test.js
+node tests/analytics.test.js
+node tests/sync-ga4-notion.test.js
 ```
+
+GA4とNotionの日次同期設定は[`docs/analytics-setup.md`](docs/analytics-setup.md)を参照してください。

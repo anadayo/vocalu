@@ -17,13 +17,19 @@
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:creator" content="@ana_wasborn">
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"VideoGame","name":"ボカる！ VOCALU","url":"https://anadayo.github.io/vocalu/","description":"ボカロ楽曲を集めて遊ぶ無料のファンメイドデジタルカードゲーム","gamePlatform":"Web Browser","applicationCategory":"Game","operatingSystem":"Web","inLanguage":"ja","offers":{"@type":"Offer","price":"0","priceCurrency":"JPY"}}</script>
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-1RKFX1HCCV"></script>
   <script>
     window.dataLayer=window.dataLayer||[];
     function gtag(){dataLayer.push(arguments)}
-    gtag('js',new Date());
+    window.VOCALU_GA_MEASUREMENT_ID='G-1RKFX1HCCV';
     window.VOCALU_ANALYTICS_ENABLED=location.hostname==='anadayo.github.io';
-    gtag('config','G-1RKFX1HCCV',{send_page_view:window.VOCALU_ANALYTICS_ENABLED,content_group:'vocalu'});
+    if(window.VOCALU_ANALYTICS_ENABLED){
+      var ga=document.createElement('script');
+      ga.async=true;
+      ga.src='https://www.googletagmanager.com/gtag/js?id='+encodeURIComponent(window.VOCALU_GA_MEASUREMENT_ID);
+      document.head.appendChild(ga);
+      gtag('js',new Date());
+      gtag('config',window.VOCALU_GA_MEASUREMENT_ID,{send_page_view:true,content_group:'vocalu'});
+    }
     if('serviceWorker' in navigator){navigator.serviceWorker.getRegistrations().then(function(registrations){registrations.forEach(function(registration){if(registration.scope.indexOf('/vocalu/')!==-1)registration.unregister();});});}
   </script>
   <link rel="manifest" href="manifest.webmanifest">
@@ -42,6 +48,7 @@
   <script src="js/song-media.js?v=20261029-pack-flow-1" defer></script>
   <script src="js/catalog.js?v=20261031-skill-target-v2" defer></script>
   <script src="js/engine.js?v=20261031-leader-damage-v3" defer></script>
-  <script src="js/app.js?v=20261031-leader-damage-v7" defer></script>
+  <script src="js/analytics.js?v=20261101-analytics-v1" defer></script>
+  <script src="js/app.js?v=20261101-analytics-v1" defer></script>
 </body>
 </html>

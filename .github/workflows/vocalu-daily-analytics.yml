@@ -1,0 +1,40 @@
+name: VOCALU daily analytics sync
+
+on:
+  schedule:
+    - cron: '20 18 * * *'
+  workflow_dispatch:
+    inputs:
+      report_date:
+        description: 'JST report date (YYYY-MM-DD). Empty uses yesterday.'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vocalu-daily-analytics
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GA4_PROPERTY_ID: ${{ secrets.GA4_PROPERTY_ID }}
+      GA4_SERVICE_ACCOUNT_JSON: ${{ secrets.GA4_SERVICE_ACCOUNT_JSON }}
+      NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+      NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
+      TARGET_DATE: ${{ inputs.report_date }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Validate analytics code
+        run: |
+          node tests/analytics.test.js
+          node tests/sync-ga4-notion.test.js
+      - name: Sync previous JST day to Notion
+        run: node scripts/sync-ga4-notion.js
