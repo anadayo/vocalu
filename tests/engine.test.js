@@ -109,6 +109,10 @@ assert.equal(combat.lastImpact.type,'life','direct life damage exposes the life-
 assert.equal(combat.lastLifeTransfer.side,'cpu','life damage reports which leader sends a card to hand');
 assert.ok(combat.lastLifeTransfer.cardId,'life-to-hand animation receives the exact revealed card');
 assert.equal(combat.lastLifeTransfer.revealed,false,'ordinary life cards stay face-down during the hand transfer');
+assert.equal(combat.lastMotion.targetName,'LEADER','direct damage animation targets the leader rather than the life rail');
+assert.equal(combat.lastLifeTransfer.lifeBeforeDamage,5,'leader damage records the life value before impact');
+assert.equal(combat.lastLifeTransfer.lifeAfterDamage,4,'leader damage records the life value after impact');
+assert.equal(combat.lastLifeTransfer.lifeAfterResolution,4,'ordinary life transfer does not alter the damaged life value');
 combat.cpu.life = 1;
 combat.user.field[0].attacked = false;
 E.attack(combat,'user',0,'life',null,null);
@@ -313,6 +317,8 @@ assert.equal(destroyTrigger.user.field.some(c => c.currentPower === 9000),false,
 const healTrigger = makeTriggerBattle('heal_one');
 assert.equal(healTrigger.cpu.life,2,'heal trigger restores one life after damage');
 assert.equal(healTrigger.cpu.lifeCards.length,1,'heal trigger places a deck card into life');
+assert.equal(healTrigger.lastLifeTransfer.lifeAfterDamage,1,'heal trigger metadata preserves the damaged life value');
+assert.equal(healTrigger.lastLifeTransfer.lifeAfterResolution,2,'heal trigger metadata preserves the post-trigger life value');
 
 const finalHealBattle = E.makeBattle(strongDeck, weakDeck, () => 0.1);
 finalHealBattle.cpu.life = 1;

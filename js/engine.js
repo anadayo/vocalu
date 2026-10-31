@@ -250,7 +250,7 @@
       state.log.unshift('重音テト「REPEAT BEAT」· POWER +' + tetoBonus + (p.leaderAwakened ? ' · AWAKEN' : ''));
     }
     var attackPower = effectivePower(attacker);
-    state.lastMotion = { type: 'attack', side: side, attackerIndex: attackerIndex, targetType: targetType, targetIndex: targetIndex, cardId: attacker.id, cardName: attacker.name, power: attackPower, targetName: targetType === 'song' && enemy.field[targetIndex] ? enemy.field[targetIndex].name : 'LIFE' };
+    state.lastMotion = { type: 'attack', side: side, attackerIndex: attackerIndex, targetType: targetType, targetIndex: targetIndex, cardId: attacker.id, cardName: attacker.name, power: attackPower, targetName: targetType === 'song' && enemy.field[targetIndex] ? enemy.field[targetIndex].name : 'LEADER' };
     attacker.attacked = true;
     state.phase = 'attack';
     if (targetType === 'song') {
@@ -290,11 +290,18 @@
         if (attackPower > guardPower) readyAfterKnockout(state, side, attacker);
         state.log.unshift(guard.name + ' でライフをガード' + (guard.attacked ? ' · REST補正 -1000' : '') + (attackPower === guardPower ? ' · 相打ち' : ''));
       } else {
+        var lifeBeforeDamage = enemy.life;
         enemy.life -= 1;
+        var lifeAfterDamage = enemy.life;
         awakenLeader(state, side === 'user' ? 'cpu' : 'user');
         state.lastImpact = { type: 'life', side: side === 'user' ? 'cpu' : 'user' };
         resolveLifeCard(state, side === 'user' ? 'cpu' : 'user', side);
-        state.log.unshift(attacker.name + ' がライフへ攻撃');
+        if(state.lastLifeTransfer){
+          state.lastLifeTransfer.lifeBeforeDamage=lifeBeforeDamage;
+          state.lastLifeTransfer.lifeAfterDamage=lifeAfterDamage;
+          state.lastLifeTransfer.lifeAfterResolution=enemy.life;
+        }
+        state.log.unshift(attacker.name + ' がリーダーへ攻撃 · LIFE -1');
         if (enemy.life <= 0) state.winner = side;
       }
     }

@@ -154,3 +154,26 @@
 .skill-choice-heading b{font-size:13px}
 .skill-choice-heading small,.skill-choice-actions p{color:#e9dfb6;font-size:9px}
 @keyframes skillTargetPulse{to{transform:translateY(-3px) scale(1.025);filter:drop-shadow(0 0 20px #ffd65c)}}
+
+/* Leader-first damage flow and resilient official-video links. */
+.leader-skin{padding:0;color:inherit;text-align:inherit;font:inherit}
+.leader-skin.targetable{cursor:pointer;border-color:#ff7186;box-shadow:inset 0 0 18px #ff718625,0 0 16px #ff718677;animation:leaderTargetPulse .75s ease-in-out infinite alternate}
+.leader-skin.targetable:after{content:"ATTACK";position:absolute;z-index:8;left:50%;top:5px;transform:translateX(-50%);padding:2px 5px;border:1px solid #ff9cac;background:#240b10e8;color:#fff;font-size:6px;font-weight:950;letter-spacing:1px}
+.leader-hit-step{position:fixed;z-index:54;inset:0;display:grid;place-content:center;gap:4px;pointer-events:none;background:radial-gradient(circle,#ff718638,#000b 62%);text-align:center;animation:leaderStepFade .52s ease-out forwards}
+.leader-hit-step b{color:#fff;font-size:clamp(34px,11vw,76px);font-style:italic;line-height:1;text-shadow:0 0 10px #fff,0 0 34px #ff4664}
+.leader-hit-step span{color:#ffd5dc;font-size:10px;font-weight:950;letter-spacing:2px}
+.leader-hit-step.life-loss{background:radial-gradient(circle,#f5c75432,#000b 62%)}
+.leader-hit-step.life-loss b{text-shadow:0 0 10px #fff,0 0 34px #f5c754}
+.digital-life-target.life-decreasing .life-readout b{color:#ffd76e;animation:lifeNumberDrop .42s ease-out}
+.digital-life-target.life-decreasing .life-cell.broken:last-child{animation:lifeCellBreak .42s ease-out}
+.song-player-fallback img{display:block;width:100%;aspect-ratio:16/9;object-fit:cover;border:1px solid var(--line);background:#000}
+.official-video-poster{position:relative;display:block;overflow:hidden;border-radius:4px;color:#fff;text-decoration:none}
+.official-video-poster b{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);padding:9px 12px;border:1px solid #fff9;border-radius:4px;background:#071113e8;color:#fff;font-size:10px;box-shadow:0 4px 18px #000c}
+.official-video-poster:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.official-video-fallback{display:flex;align-items:center;justify-content:center;min-height:38px;padding:8px 10px;border:1px solid var(--accent);border-radius:4px;background:#132325;color:#dffffb;font-size:10px;font-weight:900;text-align:center;text-decoration:none}
+.song-player>small{color:var(--muted);font-size:8px;line-height:1.5}
+@keyframes leaderTargetPulse{to{transform:translateY(-2px) scale(1.025);filter:brightness(1.12)}}
+@keyframes leaderStepFade{0%{opacity:0;transform:scale(.8)}18%,72%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(1.08)}}
+@keyframes lifeNumberDrop{0%{transform:scale(1.7);filter:brightness(1.8)}100%{transform:none}}
+@keyframes lifeCellBreak{0%{opacity:1;transform:scale(1.25) rotate(0)}100%{opacity:.2;transform:scale(.65) rotate(18deg)}}
+@media(prefers-reduced-motion:reduce){.leader-skin.targetable,.leader-hit-step,.digital-life-target.life-decreasing .life-readout b,.digital-life-target.life-decreasing .life-cell{animation:none!important}}
