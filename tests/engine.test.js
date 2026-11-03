@@ -19,6 +19,8 @@ assert.equal(global.VocaluCatalog.cards.some(c => c.variant === 'コレクター
 assert.equal(global.VocaluCatalog.producers.filter(c => c.thumbnailVerified && c.thumbnailUrl && c.profileUrl).length, 20, 'all producers have sourced profile artwork');
 assert.equal(global.VocaluCatalog.singers.filter(c => c.thumbnailVerified && c.thumbnailUrl && c.profileUrl).length, 40, 'all singers have sourced profile artwork');
 assert.equal(global.VocaluCatalog.cards.filter(c => c.thumbnailVerified && c.thumbnailUrl).length, 300, 'all cards have verified artwork');
+assert.equal(global.VocaluCatalog.songs.filter(c => c.videoUrl).length, 240, 'every song card keeps an official playback or source link');
+assert.ok(global.VocaluCatalog.songs.filter(c => /(?:youtube\.com|youtu\.be)/.test(c.videoUrl || '')).length >= 200, 'the verified YouTube catalog remains available from card details');
 assert.equal(global.VocaluCatalog.producers.filter(c => c.trigger && c.trigger.type).length, 10, 'half of producers have reversal triggers');
 assert.equal(global.VocaluCatalog.singers.filter(c => c.trigger && c.trigger.type).length, 20, 'half of singers have reversal triggers');
 assert.equal(global.VocaluCatalog.producers.filter(c => c.abilities && c.abilities.length).length, 20, 'all producers have support effects');

@@ -11,35 +11,36 @@
   var PLAYER_PROFILES_STORAGE = 'vocalu-player-profiles-v1';
   var CURRENT_PLAYER_STORAGE = 'vocalu-current-player-v1';
   var LEADER_STORAGE = 'vocalu-leader-v1';
-  var MUSIC_STORAGE = 'vocalu-music-v1';
+  var MUSIC_STORAGE = 'vocalu-audio-v2';
   var state = {
     screen: 'home', opened: [], packNo: 0, selected: [], battle: null,
     selectedUnit: null, targeting: null, pendingAttack: null, panelTab: 'log', triggerResume: null, lifeSequence: null, mulliganSelected: [],
     difficulty: 'normal', matchMode: 'free', leaderChoice: loadLeaderChoice(), rank: loadRank(),
     collection: loadAndMigrate(), light: matchMedia('(prefers-reduced-motion: reduce)').matches,
     collectionType: 'all', collectionSort: 'number', collectionView: 'all', collectionQuery: '',
-    music: { ready: false, playing: false, pending: false, enabled: loadMusicEnabled(), volume: 40, title: 'ユーザー制作楽曲メドレー' }
+    music: { ready: false, playing: false, enabled: loadAudioPreference('musicEnabled',true), volume: loadAudioPreference('musicVolume',40), theme: 'menu', title: 'VOCALU LOBBY THEME' },
+    sound: { enabled: loadAudioPreference('soundEnabled',true), volume: loadAudioPreference('soundVolume',55) }
   };
-  var yt = null;
+  var audioContext = null;
+  var musicGain = null;
+  var soundGain = null;
+  var musicTimer = null;
+  var musicStep = 0;
+  var nextMusicNote = 0;
+  var activePreviewAudio = null;
+  var noiseBuffer = null;
   var renderedScreen = null;
   var battleInputLockedUntil = 0;
   var battleMotionCleanupTimer = null;
   var lifeSequenceTimer = null;
   var deckBuildTracked = false;
 
-  function loadMusicEnabled() {
-    try { return localStorage.getItem(MUSIC_STORAGE) !== 'off'; } catch (ignore) { return true; }
+  function loadAudioPreference(key,fallback) {
+    try { var saved=JSON.parse(localStorage.getItem(MUSIC_STORAGE)||'{}');return saved[key]==null?fallback:saved[key]; } catch (ignore) { return fallback; }
   }
 
-  function saveMusicEnabled() {
-    try { localStorage.setItem(MUSIC_STORAGE, state.music.enabled ? 'on' : 'off'); } catch (ignore) {}
-  }
-
-  function syncMusicUi() {
-    var dock=document.getElementById('music-dock'),title=document.getElementById('music-dock-title');
-    if(!dock)return;
-    dock.hidden=!state.music.enabled;
-    if(title)title.textContent=state.music.title||'ユーザー制作楽曲メドレー';
+  function saveAudioPreferences() {
+    try { localStorage.setItem(MUSIC_STORAGE,JSON.stringify({musicEnabled:state.music.enabled,musicVolume:state.music.volume,soundEnabled:state.sound.enabled,soundVolume:state.sound.volume})); } catch (ignore) {}
   }
 
   function track(name, params) {
@@ -213,6 +214,7 @@
     else if (state.screen === 'battle') renderBattle();
     else if (state.screen === 'result') renderResult();
     else if (state.screen === 'collection') renderCollection();
+    if(state.music.playing)setMusicTheme(screenMusicTheme());
     if (screenChanged) {
       if(state.screen==='home')track('lobby_view',{screen_name:'lobby'});
       else if(state.screen==='collection')track('collection_view',{screen_name:'collection'});
@@ -360,7 +362,7 @@
     if(state.pendingAttack)requestAnimationFrame(updateCpuAttackTrail);
   }
   function choose(title,buttons,canCancel) { var cancel=canCancel===false?'':'<button class="secondary" data-action="close-modal">キャンセル</button>';var modal=document.createElement('div');modal.className='modal';modal.innerHTML='<div class="dialog"><h2>' + esc(title) + '</h2><div class="actions">' + buttons + cancel + '</div></div>';document.body.appendChild(modal); }
-  function playFromHand(index) { var card=state.battle.user.hand[index];if(!card)return;if(state.battle.active!=='user')return toast('CPUのターンです');if((card.cost||0)>state.battle.user.cost)return toast('使える葱COSTが足りません');if(card.type==='song'&&state.battle.user.field.length>=3)choose('入れ替える楽曲',state.battle.user.field.map(function(song,i){return '<button class="secondary" data-action="replace-play" data-hand="' + index + '" data-index="' + i + '">' + esc(song.name) + '</button>';}).join(''));else if(card.type==='singer'&&state.battle.user.field.length)choose('装備する楽曲',state.battle.user.field.map(function(song,i){return '<button class="secondary" data-action="equip-play" data-hand="' + index + '" data-index="' + i + '">' + esc(song.name) + '</button>';}).join(''));else{lockBattleInput();VocaluEngine.playCard(state.battle,'user',index,0);if(card.type==='producer')showSupportNotice();else render();} }
+  function playFromHand(index) { var card=state.battle.user.hand[index];if(!card)return;if(state.battle.active!=='user')return toast('CPUのターンです');if((card.cost||0)>state.battle.user.cost)return toast('使える葱COSTが足りません');if(card.type==='song'&&state.battle.user.field.length>=3)choose('入れ替える楽曲',state.battle.user.field.map(function(song,i){return '<button class="secondary" data-action="replace-play" data-hand="' + index + '" data-index="' + i + '">' + esc(song.name) + '</button>';}).join(''));else if(card.type==='singer'&&state.battle.user.field.length)choose('装備する楽曲',state.battle.user.field.map(function(song,i){return '<button class="secondary" data-action="equip-play" data-hand="' + index + '" data-index="' + i + '">' + esc(song.name) + '</button>';}).join(''));else{lockBattleInput();VocaluEngine.playCard(state.battle,'user',index,0);playSfx(card.type==='producer'?'support':'summon');playEntrancePhrase(card);if(card.type==='producer')showSupportNotice();else render();} }
   function showSupportNotice(){var support=state.battle&&state.battle.lastSupport;if(!support)return render();state.battle.lastSupport=null;render();var card=VocaluCatalog.cards.find(function(item){return item.id===support.cardId;}),modal=document.createElement('div');modal.className='modal support-modal';modal.dataset.revealed=support.revealed?JSON.stringify(support.revealed):'';var resolved=(support.resolved||[]).map(function(result){return '<span>✓ ' + esc(result) + '</span>';}).join('');modal.innerHTML='<div class="dialog support-dialog"><span class="support-cut-in">SUPPORT</span><h2>' + esc(support.cardName) + '</h2>' + (card?'<div class="support-card">' + cardFace(card,false) + '</div>':'') + '<div class="support-abilities">' + support.abilities.map(function(ability){return '<section><b>' + esc(ability.label) + '</b><p>' + esc(ability.text) + '</p></section>';}).join('') + '</div>' + (resolved?'<div class="support-resolved"><b>RESOLVED</b>'+resolved+'</div>':'') + '<button class="primary" data-action="support-next">' + (support.revealed?'山札の上を公開する':'効果を確認して続ける') + '</button></div>';document.body.appendChild(modal);}
   function revealSupportCard(modal){var info={};try{info=JSON.parse(modal.dataset.revealed||'{}');}catch(ignore){}var card=VocaluCatalog.cards.find(function(item){return item.id===info.cardId;}),dialog=modal.querySelector('.dialog');if(!card)return modal.remove();dialog.innerHTML='<span class="support-cut-in">DECK TOP</span><h2>山札の上から公開</h2><div class="support-revealed ' + (info.outcome==='bottom'?'to-bottom':'to-hand') + '">' + cardFace(card,false) + '</div><div class="support-destination"><span>' + (info.outcome==='bottom'?'条件に合わないため':'条件を満たしたため') + '</span><strong>' + esc(info.label||'効果処理') + '</strong></div><button class="primary" data-action="support-finish">確認して続ける</button>';}
   function positionAttackTrail(trail,source,targetX,targetY){if(!trail||!source)return;var rect=source.getBoundingClientRect(),x=rect.left+rect.width/2,y=rect.top+rect.height/2,dx=targetX-x,dy=targetY-y;trail.style.left=x+'px';trail.style.top=y+'px';trail.style.width=Math.max(12,Math.hypot(dx,dy))+'px';trail.style.transform='rotate('+Math.atan2(dy,dx)+'rad)';}
@@ -384,12 +386,13 @@
     lifeGuards.sort(function(a,b){var aSurvives=a.power>=attackPower?0:1,bSurvives=b.power>=attackPower?0:1;return aSurvives-bSurvives||a.power-b.power;});
     return lifeGuards.length?lifeGuards[0].index:null;
   }
-  function resolveUserAttack(targetType,targetIndex) { var attacker=state.targeting,guard=chooseCpuGuard(targetType,targetIndex,attacker);state.targeting=null;if(guard<0)guard=null;lockBattleInput();VocaluEngine.attack(state.battle,'user',attacker,targetType,targetIndex,guard);if(guard!=null)toast(targetType==='life'?'CPUの楽曲がリーダーをガード':'CPUのACTIVE楽曲がガード');state.selectedUnit=null;afterAction(); }
-  function showTriggerNotice(resume) { var trigger=state.battle&&state.battle.lastTrigger;if(!trigger)return false;state.battle.lastTrigger=null;state.triggerResume=resume||null;render();var card=VocaluCatalog.cards.find(function(item){return item.id===trigger.cardId;});var modal=document.createElement('div');modal.className='modal trigger-modal';modal.innerHTML='<div class="dialog trigger-dialog"><span class="trigger-cut-in">TRIGGER</span><h2>' + esc(trigger.label) + '</h2>' + (card?'<div class="trigger-card">' + cardFace(card,false) + '</div>':'<b class="trigger-card-name">' + esc(trigger.cardName) + '</b>') + '<div class="trigger-effect"><span>' + esc((trigger.side==='user'?'あなた':'CPU')+'のLIFEから発動') + '</span><strong>' + esc(trigger.cardName) + '</strong><p>' + esc(trigger.text) + '</p></div><button class="primary" data-action="dismiss-trigger">効果を確認して続ける</button></div>';setTimeout(function(){if(state.battle)document.body.appendChild(modal);},state.light?40:720);return true; }
-  function startLeaderDamageSequence(resume){var b=state.battle,impact=b&&b.lastImpact,transfer=b&&b.lastLifeTransfer;if(!impact||impact.type!=='life'||!transfer)return false;clearTimeout(lifeSequenceTimer);battleInputLockedUntil=Date.now()+(state.light?300:3100);b.lastImpact=null;b.lastLifeTransfer=null;var trigger=b.lastTrigger,leaderAwaken=b.lastLeaderAwaken;b.lastTrigger=null;b.lastLeaderAwaken=null;state.lifeSequence={phase:'attack',side:impact.side,lifeBeforeDamage:transfer.lifeBeforeDamage,lifeAfterDamage:transfer.lifeAfterDamage,transfer:transfer,trigger:trigger,leaderAwaken:leaderAwaken,resume:resume||null};render();lifeSequenceTimer=setTimeout(function(){if(!state.lifeSequence)return;state.lifeSequence.phase='hit';render();lifeSequenceTimer=setTimeout(function(){if(!state.lifeSequence)return;state.lifeSequence.phase='life';if(state.lifeSequence.leaderAwaken)b.lastLeaderAwaken=state.lifeSequence.leaderAwaken;render();lifeSequenceTimer=setTimeout(function(){if(!state.lifeSequence)return;var sequence=state.lifeSequence;sequence.phase='transfer';b.lastLifeTransfer=sequence.transfer;render();lifeSequenceTimer=setTimeout(function(){var finished=state.lifeSequence;if(!finished)return;state.lifeSequence=null;if(finished.trigger){b.lastTrigger=finished.trigger;showTriggerNotice(finished.resume);return;}if(b.winner)finishBattle();else if(finished.resume)finished.resume();else render();},state.light?50:950);},state.light?50:420);},state.light?50:520);},state.light?50:700);return true;}
+  function resolveUserAttack(targetType,targetIndex) { var attacker=state.targeting,guard=chooseCpuGuard(targetType,targetIndex,attacker),fieldCount=state.battle.user.field.length+state.battle.cpu.field.length;state.targeting=null;if(guard<0)guard=null;lockBattleInput();playSfx('attack');VocaluEngine.attack(state.battle,'user',attacker,targetType,targetIndex,guard);if(state.battle.user.field.length+state.battle.cpu.field.length<fieldCount)setTimeout(function(){playSfx('destroy');},120);if(guard!=null)toast(targetType==='life'?'CPUの楽曲がリーダーをガード':'CPUのACTIVE楽曲がガード');state.selectedUnit=null;afterAction(); }
+  function showTriggerNotice(resume) { var trigger=state.battle&&state.battle.lastTrigger;if(!trigger)return false;playSfx('trigger');state.battle.lastTrigger=null;state.triggerResume=resume||null;render();var card=VocaluCatalog.cards.find(function(item){return item.id===trigger.cardId;});var modal=document.createElement('div');modal.className='modal trigger-modal';modal.innerHTML='<div class="dialog trigger-dialog"><span class="trigger-cut-in">TRIGGER</span><h2>' + esc(trigger.label) + '</h2>' + (card?'<div class="trigger-card">' + cardFace(card,false) + '</div>':'<b class="trigger-card-name">' + esc(trigger.cardName) + '</b>') + '<div class="trigger-effect"><span>' + esc((trigger.side==='user'?'あなた':'CPU')+'のLIFEから発動') + '</span><strong>' + esc(trigger.cardName) + '</strong><p>' + esc(trigger.text) + '</p></div><button class="primary" data-action="dismiss-trigger">効果を確認して続ける</button></div>';setTimeout(function(){if(state.battle)document.body.appendChild(modal);},state.light?40:720);return true; }
+  function startLeaderDamageSequence(resume){var b=state.battle,impact=b&&b.lastImpact,transfer=b&&b.lastLifeTransfer;if(!impact||impact.type!=='life'||!transfer)return false;playSfx('damage');clearTimeout(lifeSequenceTimer);battleInputLockedUntil=Date.now()+(state.light?300:3100);b.lastImpact=null;b.lastLifeTransfer=null;var trigger=b.lastTrigger,leaderAwaken=b.lastLeaderAwaken;b.lastTrigger=null;b.lastLeaderAwaken=null;state.lifeSequence={phase:'attack',side:impact.side,lifeBeforeDamage:transfer.lifeBeforeDamage,lifeAfterDamage:transfer.lifeAfterDamage,transfer:transfer,trigger:trigger,leaderAwaken:leaderAwaken,resume:resume||null};render();lifeSequenceTimer=setTimeout(function(){if(!state.lifeSequence)return;state.lifeSequence.phase='hit';render();lifeSequenceTimer=setTimeout(function(){if(!state.lifeSequence)return;state.lifeSequence.phase='life';if(state.lifeSequence.leaderAwaken)b.lastLeaderAwaken=state.lifeSequence.leaderAwaken;render();lifeSequenceTimer=setTimeout(function(){if(!state.lifeSequence)return;var sequence=state.lifeSequence;sequence.phase='transfer';b.lastLifeTransfer=sequence.transfer;render();lifeSequenceTimer=setTimeout(function(){var finished=state.lifeSequence;if(!finished)return;state.lifeSequence=null;if(finished.trigger){b.lastTrigger=finished.trigger;showTriggerNotice(finished.resume);return;}if(b.winner)finishBattle();else if(finished.resume)finished.resume();else render();},state.light?50:950);},state.light?50:420);},state.light?50:520);},state.light?50:700);return true;}
   function afterAction(){state.panelTab='log';if(startLeaderDamageSequence(state.battle.winner?finishBattle:null))return;if(showTriggerNotice(state.battle.winner?finishBattle:null))return;if(state.battle.winner)finishBattle();else render();}
   function finishBattle(){
     if(state.battle.finishQueued)return;
+    playSfx(state.battle.winner==='user'?'win':'lose');
     state.battle.finishQueued=true;
     render();
     setTimeout(completeBattle,state.light?80:1050);
@@ -451,16 +454,74 @@
   function showDiscard(side){var cards=state.battle[side].discard.slice().reverse();var title=(side==='user'?'あなた':'CPU')+'のDROP';var content=cards.length?'<div class="discard-history">' + cards.map(function(card){return '<button data-action="discard-detail" data-card="' + esc(card.id) + '">' + cardFace(card,false) + '</button>';}).join('') + '</div>':'<p class="notice">まだ使われたカードはありません。</p>';choose(title,content);}
   function toast(message){var old=document.querySelector('.error-toast');if(old)old.remove();var el=document.createElement('div');el.className='error-toast';el.textContent=message;document.body.appendChild(el);setTimeout(function(){el.remove();},3500);}
   function lockBattleInput(duration){battleInputLockedUntil=Date.now()+(state.light?40:(duration||520));}
-  function initMusic(){
-    state.music.enabled=true;state.music.pending=true;saveMusicEnabled();syncMusicUi();
-    if(yt&&state.music.ready){yt.playVideo();return;}
-    state.music.title='YouTubeを接続中';syncMusicUi();
-    window.onYouTubeIframeAPIReady=function(){try{yt=new YT.Player('yt-player',{height:'200',width:'200',playerVars:{listType:'playlist',list:'PL4hnIvXd3nC4mvwumy4IFfY4d8vVmcVGA',playsinline:1,controls:1,rel:0},events:{onReady:function(e){state.music.ready=true;e.target.setVolume(state.music.volume);if(state.music.pending)e.target.playVideo();syncMusicUi();},onStateChange:function(e){state.music.playing=e.data===1;state.music.pending=false;try{state.music.title=e.target.getVideoData().title||'ユーザー制作楽曲メドレー';}catch(ignore){}syncMusicUi();},onAutoplayBlocked:function(){state.music.playing=false;state.music.pending=false;syncMusicUi();toast('Safariの制限により、プレイヤーの再生ボタンを押してください。');},onError:function(){state.music.playing=false;syncMusicUi();toast('BGMを読み込めませんでした。');}}});}catch(err){toast('BGMの初期化に失敗しました。');}};
-    if(!document.getElementById('youtube-api')){var s=document.createElement('script');s.id='youtube-api';s.src='https://www.youtube.com/iframe_api';document.head.appendChild(s);}
+  function screenMusicTheme(){return state.screen==='battle'||state.screen==='opening'?'battle':'menu';}
+  function musicLevel(){return Math.max(0,Math.min(1,state.music.volume/100))*0.16;}
+  function soundLevel(){return Math.max(0,Math.min(1,state.sound.volume/100))*0.24;}
+  function setMusicVolume(){if(musicGain&&audioContext)musicGain.gain.setTargetAtTime(state.music.playing?musicLevel():0,audioContext.currentTime,.03);}
+  function setSoundVolume(){if(soundGain&&audioContext)soundGain.gain.setTargetAtTime(state.sound.enabled?soundLevel():0,audioContext.currentTime,.02);}
+  function scheduleTone(frequency,start,duration,type,level){
+    if(!audioContext||!musicGain||!frequency)return;
+    var osc=audioContext.createOscillator(),gain=audioContext.createGain();
+    osc.type=type||'triangle';osc.frequency.setValueAtTime(frequency,start);
+    gain.gain.setValueAtTime(.0001,start);gain.gain.exponentialRampToValueAtTime(level||.08,start+.025);gain.gain.exponentialRampToValueAtTime(.0001,start+duration);
+    osc.connect(gain);gain.connect(musicGain);osc.start(start);osc.stop(start+duration+.03);
   }
-  function startBattleMusic(){if(yt&&state.music.ready){yt.playVideo();return;}initMusic();}
-  function musicControls(){if(!state.music.ready)initMusic();choose('BGM','<p>' + esc(state.music.title) + '</p><button class="secondary" data-action="music-prev">前の曲</button><button class="secondary" data-action="music-toggle">再生 / 停止</button><button class="secondary" data-action="music-next">次の曲</button><button class="secondary" data-action="music-down">音量 -</button><button class="secondary" data-action="music-up">音量 +</button><p>音量 ' + state.music.volume + '</p>');}
-  function battleSettings(){choose('対戦設定','<div class="settings-group"><span>BGM · ユーザー制作楽曲メドレー</span><b>' + esc(state.music.title) + '</b><button class="secondary" data-action="music-toggle">' + (state.music.playing?'一時停止':'BGMを再生') + '</button><button class="secondary" data-action="music-disable">対戦BGMをOFF</button></div><label class="settings-volume"><span>BGM音量</span><b data-volume-label>' + state.music.volume + '</b><input type="range" min="0" max="100" step="5" value="' + state.music.volume + '" data-volume></label><button class="secondary" data-action="battle-toggle-light">軽量モード ' + (state.light?'ON':'OFF') + '</button><button class="danger-button" data-action="retire-confirm">対戦をリタイア</button>');}
+  function getNoiseBuffer(){if(noiseBuffer||!audioContext)return noiseBuffer;noiseBuffer=audioContext.createBuffer(1,audioContext.sampleRate,audioContext.sampleRate);var data=noiseBuffer.getChannelData(0);for(var i=0;i<data.length;i+=1)data[i]=Math.random()*2-1;return noiseBuffer;}
+  function scheduleNoise(start,duration,level,destination,filterType,frequency){
+    if(!audioContext)return;var source=audioContext.createBufferSource(),filter=audioContext.createBiquadFilter(),gain=audioContext.createGain();source.buffer=getNoiseBuffer();filter.type=filterType||'highpass';filter.frequency.value=frequency||900;gain.gain.setValueAtTime(level||.04,start);gain.gain.exponentialRampToValueAtTime(.0001,start+duration);source.connect(filter);filter.connect(gain);gain.connect(destination||soundGain);source.start(start);source.stop(start+duration+.02);
+  }
+  function scheduleSweep(start,from,to,duration,type,level,destination){if(!audioContext)return;var osc=audioContext.createOscillator(),gain=audioContext.createGain();osc.type=type||'sawtooth';osc.frequency.setValueAtTime(from,start);osc.frequency.exponentialRampToValueAtTime(Math.max(20,to),start+duration);gain.gain.setValueAtTime(.0001,start);gain.gain.exponentialRampToValueAtTime(level||.16,start+.012);gain.gain.exponentialRampToValueAtTime(.0001,start+duration);osc.connect(gain);gain.connect(destination||soundGain);osc.start(start);osc.stop(start+duration+.03);}
+  function scheduleBattleDrums(step,time){if(step%4===0)scheduleSweep(time,118,48,.16,'sine',.18,musicGain);if(step%8===4)scheduleNoise(time,.12,.055,musicGain,'highpass',1100);if(step%2===0)scheduleNoise(time,.035,.018,musicGain,'highpass',5000);}
+  function scheduleMusicStep(step,time){
+    var battle=state.music.theme==='battle';
+    var lead=battle?[587,698,880,1047,880,698,659,523,587,698,784,932,1047,932,784,698]:[523,659,784,0,659,587,523,0,440,523,659,0,587,523,494,0];
+    var bass=battle?[147,147,117,117,131,131,110,110]:[131,131,110,110,98,98,123,123];
+    var chordRoots=battle?[147,117,131,110]:[262,220,196,247],root=chordRoots[Math.floor(step/4)%4];
+    scheduleTone(bass[Math.floor(step/2)%bass.length],time,battle?.14:.24,battle?'sawtooth':'sine',battle?.044:.026);
+    scheduleTone(lead[step%lead.length],time,battle?.1:.24,battle?'square':'sine',battle?.028:.032);
+    if(step%4===0){scheduleTone(root,time,battle?.5:.86,'sine',.026);scheduleTone(root*1.2,time,battle?.5:.86,'sine',.016);scheduleTone(root*1.5,time,battle?.5:.86,'sine',.016);}
+    if(battle)scheduleBattleDrums(step,time);
+  }
+  function musicScheduler(){if(!audioContext||!state.music.playing)return;var battle=state.music.theme==='battle',bpm=battle?132:86;while(nextMusicNote<audioContext.currentTime+.3){scheduleMusicStep(musicStep,nextMusicNote);musicStep=(musicStep+1)%16;nextMusicNote+=60/bpm/(battle?4:2);}}
+  function setMusicTheme(theme){if(theme!=='battle')theme='menu';if(state.music.theme===theme)return;state.music.theme=theme;state.music.title=theme==='battle'?'VOCALU BATTLE THEME':'VOCALU LOBBY THEME';musicStep=0;if(audioContext)nextMusicNote=audioContext.currentTime+.08;}
+  function playSfx(kind){
+    if(!audioContext||!soundGain||!state.sound.enabled)return;
+    var now=audioContext.currentTime+.01;
+    if(kind==='damage'){scheduleSweep(now,125,42,.36,'sine',.34,soundGain);scheduleNoise(now,.23,.22,soundGain,'lowpass',750);scheduleSweep(now+.03,310,90,.18,'square',.1,soundGain);return;}
+    if(kind==='destroy'){scheduleNoise(now,.42,.32,soundGain,'highpass',650);scheduleSweep(now,420,38,.48,'sawtooth',.3,soundGain);scheduleSweep(now+.04,96,32,.52,'sine',.4,soundGain);return;}
+    if(kind==='attack'){scheduleNoise(now,.09,.12,soundGain,'highpass',2600);scheduleSweep(now,360,135,.18,'sawtooth',.16,soundGain);return;}
+    var notes={tap:[880,.05,'sine'],pack:[392,.22,'sawtooth'],summon:[523,.18,'triangle'],support:[659,.22,'sine'],trigger:[988,.42,'triangle'],win:[784,.5,'triangle'],lose:[147,.55,'sine']},note=notes[kind]||notes.tap;
+    var osc=audioContext.createOscillator(),gain=audioContext.createGain();osc.type=note[2];osc.frequency.setValueAtTime(note[0],now);if(kind==='attack'||kind==='damage')osc.frequency.exponentialRampToValueAtTime(Math.max(40,note[0]/2),now+note[1]);
+    gain.gain.setValueAtTime(.0001,now);gain.gain.exponentialRampToValueAtTime(.28,now+.012);gain.gain.exponentialRampToValueAtTime(.0001,now+note[1]);osc.connect(gain);gain.connect(soundGain);osc.start(now);osc.stop(now+note[1]+.03);
+  }
+  function playEntrancePhrase(card){
+    if(!card||card.type!=='song'||['SR','UR'].indexOf(card.rarity)<0||!state.sound.enabled)return;
+    if(card.previewAudioUrl){
+      try{duckMusic(6500);if(activePreviewAudio){activePreviewAudio.pause();activePreviewAudio=null;}var preview=new Audio(card.previewAudioUrl);activePreviewAudio=preview;preview.volume=Math.min(.7,state.sound.volume/100);preview.play().catch(function(){playGeneratedPhrase(card);});setTimeout(function(){if(activePreviewAudio===preview){preview.pause();activePreviewAudio=null;}},6500);return;}catch(ignorePreview){}
+    }
+    playGeneratedPhrase(card);
+  }
+  function duckMusic(duration){if(!musicGain||!audioContext||!state.music.playing)return;musicGain.gain.setTargetAtTime(musicLevel()*.22,audioContext.currentTime,.04);setTimeout(setMusicVolume,duration||900);}
+  function playGeneratedPhrase(card){
+    if(!audioContext||!soundGain)return;
+    duckMusic(card.rarity==='UR'?1200:900);
+    var scale=[262,294,330,392,440,523,587,659],seed=String(card.name||card.id).split('').reduce(function(total,char){return total+char.charCodeAt(0);},0),count=card.rarity==='UR'?6:4,start=audioContext.currentTime+.04;
+    for(var i=0;i<count;i+=1){var osc=audioContext.createOscillator(),gain=audioContext.createGain(),at=start+i*.13,freq=scale[(seed+i*3)%scale.length]*(i===count-1?2:1);osc.type=card.rarity==='UR'?'sawtooth':'triangle';osc.frequency.setValueAtTime(freq,at);gain.gain.setValueAtTime(.0001,at);gain.gain.exponentialRampToValueAtTime(card.rarity==='UR'?.2:.15,at+.02);gain.gain.exponentialRampToValueAtTime(.0001,at+.22);osc.connect(gain);gain.connect(soundGain);osc.start(at);osc.stop(at+.24);}
+  }
+  function initMusic(){
+    try{
+      if(!audioContext){var AudioCtor=window.AudioContext||window.webkitAudioContext;if(!AudioCtor)throw new Error('この端末はBGM再生に対応していません');audioContext=new AudioCtor();musicGain=audioContext.createGain();soundGain=audioContext.createGain();musicGain.gain.value=0;soundGain.gain.value=soundLevel();musicGain.connect(audioContext.destination);soundGain.connect(audioContext.destination);state.music.ready=true;}
+      state.music.enabled=true;state.music.playing=true;saveAudioPreferences();
+      audioContext.resume();nextMusicNote=audioContext.currentTime+.04;setMusicVolume();
+      clearInterval(musicTimer);musicScheduler();musicTimer=setInterval(musicScheduler,100);
+    }catch(err){state.music.playing=false;toast(err.message||'BGMを開始できませんでした');}
+  }
+  function pauseMusic(){state.music.playing=false;clearInterval(musicTimer);musicTimer=null;setMusicVolume();}
+  function startScreenMusic(theme){setMusicTheme(theme||screenMusicTheme());if(state.music.playing){if(audioContext)audioContext.resume();return;}if(audioContext){state.music.playing=true;audioContext.resume();nextMusicNote=audioContext.currentTime+.04;setMusicVolume();clearInterval(musicTimer);musicScheduler();musicTimer=setInterval(musicScheduler,100);}else initMusic();}
+  function startBattleMusic(){startScreenMusic('battle');}
+  function audioSettingsContent(){return '<div class="settings-group"><span>GAME BGM</span><b>' + esc(state.music.title) + '</b><button class="secondary" data-action="music-toggle">' + (state.music.playing?'一時停止':'BGMを再生') + '</button><button class="secondary" data-action="music-disable">BGMをOFF</button></div><label class="settings-volume"><span>BGM音量</span><b data-volume-label>' + state.music.volume + '</b><input type="range" min="0" max="100" step="5" value="' + state.music.volume + '" data-volume="music"></label><div class="settings-group"><span>効果音</span><button class="secondary" data-action="sound-toggle">' + (state.sound.enabled?'効果音ON':'効果音OFF') + '</button></div><label class="settings-volume"><span>効果音量</span><b data-sound-volume-label>' + state.sound.volume + '</b><input type="range" min="0" max="100" step="5" value="' + state.sound.volume + '" data-volume="sound"></label>';}
+  function musicControls(){choose('サウンド',audioSettingsContent());}
+  function battleSettings(){choose('対戦設定',audioSettingsContent()+'<button class="secondary" data-action="battle-toggle-light">軽量モード ' + (state.light?'ON':'OFF') + '</button><button class="danger-button" data-action="retire-confirm">対戦をリタイア</button>');}
   function battleGuide(){choose('遊び方・キーワード','<div class="rule-guide"><section><h3>勝利条件</h3><p>相手リーダーへ攻撃してLIFEを0にすると勝利。毎ターン使える葱COSTが1増え、最大10になります。後攻は最初のターンだけ2枚引き、後攻自身の1〜3ターン目は葱COSTが通常より1多くなります。</p></section><section><h3>LEADER / AWAKEN</h3><p>リーダーはデッキ外から毎ターン1回の固有スキルを使います。通常はPOWER +500。LIFE 2以下で覚醒すると+1000へ強化され、その後LIFEを回復しても覚醒は解除されません。</p></section><section><h3>ACTIVE / REST</h3><p>ACTIVEは攻撃とガードが可能で、直接攻撃されません。攻撃後はRESTになり、攻撃対象になります。REST中はPOWER -1000。同じPOWERなら双方がDROPへ行く相打ちです。</p></section><section><h3>GUARD</h3><p>ACTIVE楽曲は、味方のREST楽曲をガードできます。リーダーへの攻撃はACTIVE・RESTどちらでもガードできます。</p></section><section><h3>SUPPORT / TAG TEAM</h3><p>ボカロPは0コストで使える、1ターン1枚の使い切りサポート。山札確認・ドロー・楽曲強化などでライブを支えます。歌い手は楽曲へ装備し、TAG TEAMとしてPOWERを強化します。</p></section><section><h3>TRIGGER</h3><p>LIFEから加わったカードがTRIGGERを持つと、勝敗判定より先に逆転効果を解決します。高コスト楽曲はLIFE差の条件を満たすと無料でACTIVE登場します。</p></section></div>');}
   function logStyle(entry){if(/のターン/.test(entry))return ['turn','↻','TURN'];if(/TRIGGER/.test(entry))return ['trigger','✦','TRIGGER'];if(/攻撃|ガード/.test(entry))return ['attack','⚔','BATTLE'];if(/召喚|装備|サポート/.test(entry))return ['play','＋','PLAY'];if(/ドロー|POWER/.test(entry))return ['effect','◆','EFFECT'];return ['system','•','SYSTEM'];}
   function battleLog(){var b=state.battle;var summary='<div class="log-summary"><div><span>TURN</span><b>'+b.turn+'</b></div><div><span>YOU</span><b>LIFE '+b.user.life+'</b></div><div><span>CPU</span><b>LIFE '+b.cpu.life+'</b></div></div>';var entries=b.log.slice(0,40).map(function(entry,index){var meta=logStyle(entry);return '<div class="log-entry '+meta[0]+'"><i>'+meta[1]+'</i><div><span>'+meta[2]+(index===0?' · LATEST':'')+'</span><p>'+esc(entry)+'</p></div></div>';}).join('');choose('BATTLE HISTORY',summary+'<div class="battle-log modal-log">'+entries+'</div>');}
@@ -469,13 +530,14 @@
   function runNextCpuAttack(){var b=state.battle;if(b.winner)return finishBattle();var ai=b.cpu.field.findIndex(function(song){return !song.attacked;});if(ai<0){state.pendingAttack=null;VocaluEngine.endTurn(b,'cpu');return render();}var attacker=b.cpu.field[ai];var target=cpuTarget(attacker,b.user.field);state.pendingAttack={attackerIndex:ai,targetType:target>=0&&b.user.life>1?'song':'life',targetIndex:target>=0&&b.user.life>1?target:null};state.panelTab='action';render();}
 
   document.addEventListener('click',function(event){var button=event.target.closest('[data-action]');if(!button)return;var action=button.dataset.action;try{
+    if(state.music.enabled&&!state.music.playing&&['music-toggle','music-disable'].indexOf(action)<0)startScreenMusic();
     if(state.screen==='battle'&&state.lifeSequence&&['battle-guide','battle-settings'].indexOf(action)<0)return;
     if(state.screen==='battle'&&Date.now()<battleInputLockedUntil&&['play','replace-play','equip-play','attack-leader','end-turn','resolve-cpu-attack'].indexOf(action)>=0)return;
     if(action==='start'||action==='free-match')beginMatch('free');
     else if(action==='ranked-match'){if(state.rank.username)beginMatch('ranked');else rankRegistration(true);}
     else if(action==='edit-rank-name')rankRegistration(false);
     else if(action==='save-rank-name'){var rankInput=button.closest('.dialog').querySelector('[data-rank-name]');saveRankName(rankInput&&rankInput.value);var shouldStart=button.dataset.start==='ranked';button.closest('.modal').remove();track('vocalu_rank_name_register',{location:shouldStart?'rank_start':'lobby'});if(shouldStart)beginMatch('ranked');else render();}
-    else if(action==='open-pack'){if(button.classList.contains('opening'))return;button.classList.add('opening');button.disabled=true;setTimeout(function(){revealPack(VocaluEngine.openPack(VocaluCatalog.cards));},state.light?20:720);}
+    else if(action==='open-pack'){if(button.classList.contains('opening'))return;playSfx('pack');button.classList.add('opening');button.disabled=true;setTimeout(function(){revealPack(VocaluEngine.openPack(VocaluCatalog.cards));},state.light?20:720);}
     else if(action==='bulk-open'){while(state.packNo<5){var bulkCards=VocaluEngine.openPack(VocaluCatalog.cards),bulkHighest=bulkCards.reduce(function(best,c){return rank(c.rarity)>rank(best)?c.rarity:best;},'N');state.opened=state.opened.concat(bulkCards);state.packNo+=1;track('pack_open',{pack_number:state.packNo,highest_rarity:bulkHighest,open_method:'bulk'});}state.screen='deck';state.selected=VocaluEngine.autoBuild(state.opened);render();}
     else if(action==='next-pack'){state.screen=state.packNo<5?'pack':'deck';if(state.screen==='deck')state.selected=VocaluEngine.autoBuild(state.opened);render();}
     else if(action==='select'){var idx=Number(button.dataset.index),pos=state.selected.indexOf(idx);if(pos>=0)state.selected.splice(pos,1);else if(state.selected.length<20)state.selected.push(idx);else toast('デッキは20枚です');render();}
@@ -493,7 +555,7 @@
     else if(action==='keep-hand'){state.screen='battle';render();}
     else if(action==='play')playFromHand(Number(button.dataset.index));
     else if(action==='hand-detail'){var handCard=state.battle.user.hand[Number(button.dataset.index)];if(handCard)choose(handCard.name,detailContent(handCard));}
-    else if(action==='replace-play'||action==='equip-play'){button.closest('.modal').remove();lockBattleInput();VocaluEngine.playCard(state.battle,'user',Number(button.dataset.hand),Number(button.dataset.index));render();}
+    else if(action==='replace-play'||action==='equip-play'){var playedCard=state.battle.user.hand[Number(button.dataset.hand)];button.closest('.modal').remove();lockBattleInput();VocaluEngine.playCard(state.battle,'user',Number(button.dataset.hand),Number(button.dataset.index));playSfx(playedCard&&playedCard.type==='producer'?'support':'summon');playEntrancePhrase(playedCard);render();}
     else if(action==='select-unit'){var side=button.dataset.side,index=Number(button.dataset.index);if(state.battle.pendingPowerChoice&&state.battle.pendingPowerChoice.side==='user'&&side==='user'){VocaluEngine.resolvePowerChoice(state.battle,'user',index);state.selectedUnit=null;state.panelTab='log';render();}else if(side==='cpu'&&state.targeting!=null&&state.battle.cpu.field[index].attacked)resolveUserAttack('song',index);else if(side==='cpu'&&state.targeting!=null)toast('ACTIVE状態の楽曲は攻撃対象にできません');else{state.selectedUnit={side:side,index:index};state.panelTab='action';state.targeting=side==='user'&&state.battle.active==='user'&&!state.battle.user.field[index].attacked?index:null;render();}}
     else if(action==='skip-power-choice'){VocaluEngine.resolvePowerChoice(state.battle,'user',null);state.selectedUnit=null;state.panelTab='log';render();}
     else if(action==='attack-leader')resolveUserAttack('life',null);
@@ -509,7 +571,7 @@
     else if(action==='retire-confirm'){button.closest('.modal').remove();choose('対戦を終了しますか？','<p>現在の対戦結果と開封カードは保存されません。</p><button class="danger-button" data-action="retire">リタイアする</button>');}
     else if(action==='retire'){document.querySelectorAll('.modal').forEach(function(modal){modal.remove();});state.battle=null;state.selectedUnit=null;state.targeting=null;state.pendingAttack=null;state.screen='home';render();}
     else if(action==='end-turn'){lockBattleInput();runCpuTurn();}
-    else if(action==='resolve-cpu-attack'){var attack=state.pendingAttack||{};var targetType=button.dataset.target||attack.targetType||'life',targetIndex=targetType==='song'?Number(button.dataset.targetIndex):null,guardIndex=button.dataset.guard==='none'?null:Number(button.dataset.guard),attackerIndex=Number(button.dataset.attacker);state.pendingAttack=null;lockBattleInput();VocaluEngine.attack(state.battle,'cpu',attackerIndex,targetType,targetIndex,guardIndex);if(startLeaderDamageSequence(state.battle.winner?finishBattle:runNextCpuAttack))return;if(showTriggerNotice(state.battle.winner?finishBattle:runNextCpuAttack))return;if(state.battle.winner)finishBattle();else{render();setTimeout(runNextCpuAttack,state.light?20:520);}}
+    else if(action==='resolve-cpu-attack'){var attack=state.pendingAttack||{};var targetType=button.dataset.target||attack.targetType||'life',targetIndex=targetType==='song'?Number(button.dataset.targetIndex):null,guardIndex=button.dataset.guard==='none'?null:Number(button.dataset.guard),attackerIndex=Number(button.dataset.attacker),fieldCount=state.battle.user.field.length+state.battle.cpu.field.length;state.pendingAttack=null;lockBattleInput();playSfx('attack');VocaluEngine.attack(state.battle,'cpu',attackerIndex,targetType,targetIndex,guardIndex);if(state.battle.user.field.length+state.battle.cpu.field.length<fieldCount)setTimeout(function(){playSfx('destroy');},120);if(startLeaderDamageSequence(state.battle.winner?finishBattle:runNextCpuAttack))return;if(showTriggerNotice(state.battle.winner?finishBattle:runNextCpuAttack))return;if(state.battle.winner)finishBattle();else{render();setTimeout(runNextCpuAttack,state.light?20:520);}}
     else if(action==='dismiss-trigger'){button.closest('.modal').remove();var resume=state.triggerResume;state.triggerResume=null;if(resume)setTimeout(resume,state.light?20:280);else render();}
     else if(action==='support-next'){var supportModal=button.closest('.support-modal');if(supportModal.dataset.revealed)revealSupportCard(supportModal);else supportModal.remove();}
     else if(action==='support-finish')button.closest('.support-modal').remove();
@@ -523,18 +585,16 @@
     else if(action==='toggle-light'){state.light=!state.light;render();}
     else if(action==='share-x'){track('share_x',{method:'x',location:'lobby'});var shareText='ボカロ楽曲で20枚デッキを組んで遊べる「ボカる！」を公開しました。\n5パック開封→デッキ構築→CPU対戦までスマホで無料。\nあなたなら最初にどの曲を収録したい？\n\n#ボカロ #VOCALU';var shareUrl='https://anadayo.github.io/vocalu/?utm_source=x&utm_medium=social&utm_campaign=vocalu_launch';window.open('https://x.com/intent/post?text='+encodeURIComponent(shareText)+'&url='+encodeURIComponent(shareUrl),'_blank','noopener');}
     else if(action==='music')musicControls();
-    else if(action==='music-prev'){if(yt&&state.music.ready)yt.previousVideo();}
-    else if(action==='music-next'){if(yt&&state.music.ready)yt.nextVideo();}
-    else if(action==='music-toggle'){if(yt&&state.music.ready)(state.music.playing?yt.pauseVideo():yt.playVideo());else initMusic();}
-    else if(action==='music-disable'){state.music.enabled=false;state.music.pending=false;saveMusicEnabled();if(yt&&state.music.ready)yt.pauseVideo();syncMusicUi();var musicModal=button.closest('.modal');if(musicModal)musicModal.remove();}
-    else if(action==='music-down'||action==='music-up'){state.music.volume=Math.max(0,Math.min(100,state.music.volume+(action==='music-up'?10:-10)));if(yt&&state.music.ready)yt.setVolume(state.music.volume);button.closest('.modal').remove();musicControls();}
+    else if(action==='music-toggle'){if(state.music.playing)pauseMusic();else startScreenMusic();var toggleModal=button.closest('.modal');if(toggleModal){toggleModal.remove();if(state.screen==='battle')battleSettings();else musicControls();}else render();}
+    else if(action==='music-disable'){state.music.enabled=false;saveAudioPreferences();pauseMusic();var musicModal=button.closest('.modal');if(musicModal)musicModal.remove();render();}
+    else if(action==='sound-toggle'){state.sound.enabled=!state.sound.enabled;saveAudioPreferences();setSoundVolume();if(state.sound.enabled)playSfx('tap');var soundModal=button.closest('.modal');if(soundModal){soundModal.remove();if(state.screen==='battle')battleSettings();else musicControls();}}
     else if(action==='detail')cardDetail(button.dataset.card);
     else if(action==='force-rare'){var forced=VocaluCatalog.cards.find(function(c){return c.rarity===button.dataset.rare;});flash(button.dataset.rare);choose(button.dataset.rare+'演出確認',cardHtml(forced,-1,false));}
     else if(action==='reset-save'){localStorage.removeItem(STORAGE);localStorage.removeItem(MIGRATION);localStorage.removeItem(RANK_STORAGE);localStorage.removeItem(RANK_BOARD_STORAGE);localStorage.removeItem(PLAYER_PROFILES_STORAGE);localStorage.removeItem(CURRENT_PLAYER_STORAGE);localStorage.removeItem(LEADER_STORAGE);state.collection={};state.rank={username:'',rating:1000,wins:0,losses:0};state.leaderChoice='miku';render();}
   }catch(err){trackError(err&&err.name||'action_error','action_'+action);toast(err.message||'操作を続けられませんでした');console.error(err);}});
   document.addEventListener('submit',function(event){if(!event.target.matches('[data-collection-form]'))return;event.preventDefault();var input=event.target.querySelector('[data-collection-query]');state.collectionQuery=(input&&input.value||'').trim();render();});
   document.addEventListener('change',function(event){if(!event.target.matches('[data-collection-sort]'))return;state.collectionSort=event.target.value;render();});
-  document.addEventListener('input',function(event){if(!event.target.matches('[data-volume]'))return;state.music.volume=Number(event.target.value);var label=event.target.closest('.dialog').querySelector('[data-volume-label]');if(label)label.textContent=state.music.volume;if(yt&&state.music.ready)yt.setVolume(state.music.volume);});
+  document.addEventListener('input',function(event){if(!event.target.matches('[data-volume]'))return;var sound=event.target.dataset.volume==='sound',dialog=event.target.closest('.dialog');if(sound){state.sound.volume=Number(event.target.value);var soundLabel=dialog.querySelector('[data-sound-volume-label]');if(soundLabel)soundLabel.textContent=state.sound.volume;setSoundVolume();}else{state.music.volume=Number(event.target.value);var label=dialog.querySelector('[data-volume-label]');if(label)label.textContent=state.music.volume;setMusicVolume();}saveAudioPreferences();});
   var startY=0;app.addEventListener('touchstart',function(e){var p=e.target.closest('[data-action="open-pack"]');if(p&&e.touches[0])startY=e.touches[0].clientY;},{passive:true});app.addEventListener('touchend',function(e){var p=e.target.closest('[data-action="open-pack"]');if(p&&e.changedTouches[0]&&startY-e.changedTouches[0].clientY>35)p.click();},{passive:true});
   app.addEventListener('pointermove',function(e){if(state.targeting!=null)updateAttackTrail(e.clientX,e.clientY);},{passive:true});
   window.addEventListener('resize',function(){if(state.pendingAttack)requestAnimationFrame(updateCpuAttackTrail);});
