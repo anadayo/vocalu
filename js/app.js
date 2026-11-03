@@ -11,13 +11,14 @@
   var PLAYER_PROFILES_STORAGE = 'vocalu-player-profiles-v1';
   var CURRENT_PLAYER_STORAGE = 'vocalu-current-player-v1';
   var LEADER_STORAGE = 'vocalu-leader-v1';
+  var MUSIC_STORAGE = 'vocalu-music-v1';
   var state = {
     screen: 'home', opened: [], packNo: 0, selected: [], battle: null,
     selectedUnit: null, targeting: null, pendingAttack: null, panelTab: 'log', triggerResume: null, lifeSequence: null, mulliganSelected: [],
     difficulty: 'normal', matchMode: 'free', leaderChoice: loadLeaderChoice(), rank: loadRank(),
     collection: loadAndMigrate(), light: matchMedia('(prefers-reduced-motion: reduce)').matches,
     collectionType: 'all', collectionSort: 'number', collectionView: 'all', collectionQuery: '',
-    music: { ready: false, playing: false, volume: 40, title: 'BGM未再生' }
+    music: { ready: false, playing: false, pending: false, enabled: loadMusicEnabled(), volume: 40, title: 'ユーザー制作楽曲メドレー' }
   };
   var yt = null;
   var renderedScreen = null;
@@ -25,6 +26,22 @@
   var battleMotionCleanupTimer = null;
   var lifeSequenceTimer = null;
   var deckBuildTracked = false;
+
+  function loadMusicEnabled() {
+    try { return localStorage.getItem(MUSIC_STORAGE) !== 'off'; } catch (ignore) { return true; }
+  }
+
+  function saveMusicEnabled() {
+    try { localStorage.setItem(MUSIC_STORAGE, state.music.enabled ? 'on' : 'off'); } catch (ignore) {}
+  }
+
+  function syncMusicUi() {
+    var dock=document.getElementById('music-dock'),title=document.getElementById('music-dock-title'),toggle=document.getElementById('music-dock-toggle');
+    if(!dock)return;
+    dock.hidden=!state.music.enabled;
+    if(title)title.textContent=state.music.title||'ユーザー制作楽曲メドレー';
+    if(toggle)toggle.textContent=state.music.playing?'Ⅱ':'▶';
+  }
 
   function track(name, params) {
     if (!window.VocaluAnalytics) return false;
@@ -234,7 +251,7 @@
     app.innerHTML=shell('<div class="prebattle-head"><span>MATCH PREPARATION</span><h1>対戦前確認</h1><button class="secondary" data-action="back-deck">デッキ変更</button></div><section class="battle-setup"><div class="setup-deck"><span>YOUR DECK</span><div class="setup-card-stack">' + cardFace(lead,false) + '<i>V</i><i>V</i></div><b>VOCALU DECK</b><small>' + deck.length + ' CARDS · 楽曲 ' + stats.song + ' / P ' + stats.producer + ' / 歌い手 ' + stats.singer + '</small></div><strong class="versus">VS</strong><div class="setup-deck opponent"><span>CPU DECK</span><div class="setup-card-stack cpu"><span class="setup-card-back">V<small>VOCALU</small></span><i>V</i><i>V</i></div><b>STUDIO CPU</b><small>' + difficultyName() + '</small></div></section><section class="match-summary"><div><span>LEADER</span><b>' + esc(leader.name) + '</b></div><div><span>RULE</span><b>LIFE 5</b></div><div><span>MODE</span><b>' + (state.matchMode==='ranked'?'RANKED':'FREE') + '</b></div></section><section class="leader-select"><span>SELECT LEADER</span><div>' + leaders + '</div><p>LIFE 2以下で覚醒。回復しても覚醒状態は維持されます。</p></section>' + difficulty + '<button class="primary setup-start" data-action="battle-start">BATTLE START</button>');
   }
   function difficultyName(){return state.difficulty==='expert'?'EXPERT':state.difficulty==='hard'?'HARD':'NORMAL';}
-  function startBattle() { var deck=state.selected.map(function(i){return state.opened[i];});if(state.matchMode==='ranked')state.difficulty=VocaluEngine.rankDifficulty(state.rank.rating);track('battle_start',{mode:state.matchMode,difficulty:state.difficulty,rank:rankName(state.rank.rating),leader:state.leaderChoice});state.battle=VocaluEngine.makeBattle(deck,makeCpuDeck());VocaluEngine.setLeaders(state.battle,state.leaderChoice,state.leaderChoice==='miku'?'teto':'miku');state.selectedUnit=null;state.targeting=null;state.pendingAttack=null;state.mulliganSelected=[];state.screen='opening';render(); }
+  function startBattle() { var deck=state.selected.map(function(i){return state.opened[i];});if(state.matchMode==='ranked')state.difficulty=VocaluEngine.rankDifficulty(state.rank.rating);if(state.music.enabled)startBattleMusic();track('battle_start',{mode:state.matchMode,difficulty:state.difficulty,rank:rankName(state.rank.rating),leader:state.leaderChoice});state.battle=VocaluEngine.makeBattle(deck,makeCpuDeck());VocaluEngine.setLeaders(state.battle,state.leaderChoice,state.leaderChoice==='miku'?'teto':'miku');state.selectedUnit=null;state.targeting=null;state.pendingAttack=null;state.mulliganSelected=[];state.screen='opening';render(); }
   function startTestBattle() {
     var deck=VocaluCatalog.songs.slice(0,14).concat(VocaluCatalog.producers.slice(0,3),VocaluCatalog.singers.slice(0,3));
     state.battle=VocaluEngine.makeBattle(deck,makeCpuDeck(),function(){return .5;});
@@ -435,9 +452,16 @@
   function showDiscard(side){var cards=state.battle[side].discard.slice().reverse();var title=(side==='user'?'あなた':'CPU')+'のDROP';var content=cards.length?'<div class="discard-history">' + cards.map(function(card){return '<button data-action="discard-detail" data-card="' + esc(card.id) + '">' + cardFace(card,false) + '</button>';}).join('') + '</div>':'<p class="notice">まだ使われたカードはありません。</p>';choose(title,content);}
   function toast(message){var old=document.querySelector('.error-toast');if(old)old.remove();var el=document.createElement('div');el.className='error-toast';el.textContent=message;document.body.appendChild(el);setTimeout(function(){el.remove();},3500);}
   function lockBattleInput(duration){battleInputLockedUntil=Date.now()+(state.light?40:(duration||520));}
-  function initMusic(){if(yt&&state.music.ready){state.music.playing?yt.pauseVideo():yt.playVideo();return;}state.music.title='YouTubeを接続中';render();window.onYouTubeIframeAPIReady=function(){try{yt=new YT.Player('yt-player',{height:'1',width:'1',playerVars:{listType:'playlist',list:'PL4hnIvXd3nC4mvwumy4IFfY4d8vVmcVGA',playsinline:1,controls:0},events:{onReady:function(e){state.music.ready=true;e.target.setVolume(state.music.volume);e.target.playVideo();},onStateChange:function(e){state.music.playing=e.data===1;try{state.music.title=e.target.getVideoData().title||'VOCALU BGM';}catch(ignore){}render();},onError:function(){toast('BGMを読み込めませんでした。');}}});}catch(err){toast('BGMの初期化に失敗しました。');}};if(!document.getElementById('youtube-api')){var s=document.createElement('script');s.id='youtube-api';s.src='https://www.youtube.com/iframe_api';document.head.appendChild(s);}}
+  function initMusic(){
+    state.music.enabled=true;state.music.pending=true;saveMusicEnabled();syncMusicUi();
+    if(yt&&state.music.ready){yt.playVideo();return;}
+    state.music.title='YouTubeを接続中';syncMusicUi();
+    window.onYouTubeIframeAPIReady=function(){try{yt=new YT.Player('yt-player',{height:'200',width:'200',playerVars:{listType:'playlist',list:'PL4hnIvXd3nC4mvwumy4IFfY4d8vVmcVGA',playsinline:1,controls:1,rel:0},events:{onReady:function(e){state.music.ready=true;e.target.setVolume(state.music.volume);if(state.music.pending)e.target.playVideo();syncMusicUi();},onStateChange:function(e){state.music.playing=e.data===1;state.music.pending=false;try{state.music.title=e.target.getVideoData().title||'ユーザー制作楽曲メドレー';}catch(ignore){}syncMusicUi();},onAutoplayBlocked:function(){state.music.playing=false;state.music.pending=false;syncMusicUi();toast('Safariの制限により、プレイヤーの再生ボタンを押してください。');},onError:function(){state.music.playing=false;syncMusicUi();toast('BGMを読み込めませんでした。');}}});}catch(err){toast('BGMの初期化に失敗しました。');}};
+    if(!document.getElementById('youtube-api')){var s=document.createElement('script');s.id='youtube-api';s.src='https://www.youtube.com/iframe_api';document.head.appendChild(s);}
+  }
+  function startBattleMusic(){if(yt&&state.music.ready){yt.playVideo();return;}initMusic();}
   function musicControls(){if(!state.music.ready)initMusic();choose('BGM','<p>' + esc(state.music.title) + '</p><button class="secondary" data-action="music-prev">前の曲</button><button class="secondary" data-action="music-toggle">再生 / 停止</button><button class="secondary" data-action="music-next">次の曲</button><button class="secondary" data-action="music-down">音量 -</button><button class="secondary" data-action="music-up">音量 +</button><p>音量 ' + state.music.volume + '</p>');}
-  function battleSettings(){choose('対戦設定','<div class="settings-group"><span>BGM</span><b>' + esc(state.music.title) + '</b><button class="secondary" data-action="music-toggle">' + (state.music.playing?'一時停止':'BGMを再生') + '</button></div><label class="settings-volume"><span>BGM音量</span><b data-volume-label>' + state.music.volume + '</b><input type="range" min="0" max="100" step="5" value="' + state.music.volume + '" data-volume></label><button class="secondary" data-action="battle-toggle-light">軽量モード ' + (state.light?'ON':'OFF') + '</button><button class="danger-button" data-action="retire-confirm">対戦をリタイア</button>');}
+  function battleSettings(){choose('対戦設定','<div class="settings-group"><span>BGM · ユーザー制作楽曲メドレー</span><b>' + esc(state.music.title) + '</b><button class="secondary" data-action="music-toggle">' + (state.music.playing?'一時停止':'BGMを再生') + '</button><button class="secondary" data-action="music-disable">対戦BGMをOFF</button></div><label class="settings-volume"><span>BGM音量</span><b data-volume-label>' + state.music.volume + '</b><input type="range" min="0" max="100" step="5" value="' + state.music.volume + '" data-volume></label><button class="secondary" data-action="battle-toggle-light">軽量モード ' + (state.light?'ON':'OFF') + '</button><button class="danger-button" data-action="retire-confirm">対戦をリタイア</button>');}
   function battleGuide(){choose('遊び方・キーワード','<div class="rule-guide"><section><h3>勝利条件</h3><p>相手リーダーへ攻撃してLIFEを0にすると勝利。毎ターン使える葱COSTが1増え、最大10になります。後攻は最初のターンだけ2枚引き、後攻自身の1〜3ターン目は葱COSTが通常より1多くなります。</p></section><section><h3>LEADER / AWAKEN</h3><p>リーダーはデッキ外から毎ターン1回の固有スキルを使います。通常はPOWER +500。LIFE 2以下で覚醒すると+1000へ強化され、その後LIFEを回復しても覚醒は解除されません。</p></section><section><h3>ACTIVE / REST</h3><p>ACTIVEは攻撃とガードが可能で、直接攻撃されません。攻撃後はRESTになり、攻撃対象になります。REST中はPOWER -1000。同じPOWERなら双方がDROPへ行く相打ちです。</p></section><section><h3>GUARD</h3><p>ACTIVE楽曲は、味方のREST楽曲をガードできます。リーダーへの攻撃はACTIVE・RESTどちらでもガードできます。</p></section><section><h3>SUPPORT / TAG TEAM</h3><p>ボカロPは0コストで使える、1ターン1枚の使い切りサポート。山札確認・ドロー・楽曲強化などでライブを支えます。歌い手は楽曲へ装備し、TAG TEAMとしてPOWERを強化します。</p></section><section><h3>TRIGGER</h3><p>LIFEから加わったカードがTRIGGERを持つと、勝敗判定より先に逆転効果を解決します。高コスト楽曲はLIFE差の条件を満たすと無料でACTIVE登場します。</p></section></div>');}
   function logStyle(entry){if(/のターン/.test(entry))return ['turn','↻','TURN'];if(/TRIGGER/.test(entry))return ['trigger','✦','TRIGGER'];if(/攻撃|ガード/.test(entry))return ['attack','⚔','BATTLE'];if(/召喚|装備|サポート/.test(entry))return ['play','＋','PLAY'];if(/ドロー|POWER/.test(entry))return ['effect','◆','EFFECT'];return ['system','•','SYSTEM'];}
   function battleLog(){var b=state.battle;var summary='<div class="log-summary"><div><span>TURN</span><b>'+b.turn+'</b></div><div><span>YOU</span><b>LIFE '+b.user.life+'</b></div><div><span>CPU</span><b>LIFE '+b.cpu.life+'</b></div></div>';var entries=b.log.slice(0,40).map(function(entry,index){var meta=logStyle(entry);return '<div class="log-entry '+meta[0]+'"><i>'+meta[1]+'</i><div><span>'+meta[2]+(index===0?' · LATEST':'')+'</span><p>'+esc(entry)+'</p></div></div>';}).join('');choose('BATTLE HISTORY',summary+'<div class="battle-log modal-log">'+entries+'</div>');}
@@ -502,7 +526,8 @@
     else if(action==='music')musicControls();
     else if(action==='music-prev'){if(yt&&state.music.ready)yt.previousVideo();}
     else if(action==='music-next'){if(yt&&state.music.ready)yt.nextVideo();}
-    else if(action==='music-toggle'){if(yt&&state.music.ready)(state.music.playing?yt.pauseVideo():yt.playVideo());}
+    else if(action==='music-toggle'){if(yt&&state.music.ready)(state.music.playing?yt.pauseVideo():yt.playVideo());else initMusic();}
+    else if(action==='music-disable'){state.music.enabled=false;state.music.pending=false;saveMusicEnabled();if(yt&&state.music.ready)yt.pauseVideo();syncMusicUi();var musicModal=button.closest('.modal');if(musicModal)musicModal.remove();}
     else if(action==='music-down'||action==='music-up'){state.music.volume=Math.max(0,Math.min(100,state.music.volume+(action==='music-up'?10:-10)));if(yt&&state.music.ready)yt.setVolume(state.music.volume);button.closest('.modal').remove();musicControls();}
     else if(action==='detail')cardDetail(button.dataset.card);
     else if(action==='force-rare'){var forced=VocaluCatalog.cards.find(function(c){return c.rarity===button.dataset.rare;});flash(button.dataset.rare);choose(button.dataset.rare+'演出確認',cardHtml(forced,-1,false));}
