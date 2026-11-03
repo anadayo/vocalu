@@ -12,6 +12,15 @@
 
   function clone(value) { return JSON.parse(JSON.stringify(value)); }
   function randomItem(items, rng) { return items[Math.floor(rng() * items.length)]; }
+  function producerMatches(songProducer, producerName) {
+    function normalize(value) {
+      return String(value || '').toLowerCase().replace(/\s+/g, '');
+    }
+    var expected = normalize(producerName);
+    return String(songProducer || '').split(/[×＆&＋+,／/]/).some(function (part) {
+      return normalize(part) === expected;
+    });
+  }
   function weightedRarity(rng) {
     var roll = rng() * 100;
     var total = 0;
@@ -169,14 +178,19 @@
       p.cost -= card.cost;
       p.producerUsed = true;
       p.hand.splice(handIndex, 1);
-      var supportEvent = { side: side, cardId: card.id, cardName: card.name, abilities: clone(card.abilities || []), revealed: null };
+      var supportEvent = { side: side, cardId: card.id, cardName: card.name, abilities: clone(card.abilities || []), revealed: null, resolved: [] };
       (card.abilities || []).forEach(function (ability) {
         if (ability.type === 'draw_cards') {
-          drawCards(p, ability.count || 1);
+          var drawCount = ability.count || 1;
+          var handBeforeDraw = p.hand.length;
+          drawCards(p, drawCount);
+          supportEvent.resolved.push((p.hand.length - handBeforeDraw) + '枚ドロー');
         } else if (ability.type === 'power_all') {
           p.field.forEach(function (song) { song.turnPowerBonus = (song.turnPowerBonus || 0) + (ability.amount || 0); });
+          supportEvent.resolved.push('楽曲' + p.field.length + '枚を POWER +' + (ability.amount || 0));
         } else if (ability.type === 'power_one' && p.field.length) {
           queuePowerChoice(state, side, ability, card.name);
+          supportEvent.resolved.push('強化する楽曲を選択');
         } else if (ability.type === 'reveal_top_cost_song' && p.deck.length) {
           var revealed = p.deck.shift();
           if (revealed.type === 'song' && (revealed.cost || 0) <= (ability.maxCost || 1)) {
@@ -194,9 +208,14 @@
           enemy.discard = enemy.discard.concat(destroyed);
           if (destroyed.length) state.lastImpact = { type: 'knockout', side: side === 'user' ? 'cpu' : 'user', label: 'ALL BREAK' };
         } else if (ability.type === 'creator_synergy') {
-          var linked=p.field.filter(function(song){return song.producer===ability.producer;});
+          var linked=p.field.filter(function(song){return producerMatches(song.producer,ability.producer);});
           linked.forEach(function(song){song.turnPowerBonus=(song.turnPowerBonus||0)+(ability.amount||0);});
-          if(linked.length)state.log.unshift(card.name+'の制作楽曲 '+linked.length+'枚を強化');
+          if(linked.length){
+            supportEvent.resolved.push('制作楽曲' + linked.length + '枚を POWER +' + (ability.amount || 0));
+            state.log.unshift(card.name+'の制作楽曲 '+linked.length+'枚を強化');
+          }else{
+            supportEvent.resolved.push('制作楽曲なし');
+          }
         }
         state.log.unshift(card.name + '「' + ability.label + '」· ' + ability.text);
       });
@@ -508,7 +527,7 @@
       if(ability.type==='draw_cards'||ability.type==='draw_one')value+=1200*(ability.count||1);
       else if(ability.type==='power_all')value+=(ability.amount||0)*Math.max(1,player.field.length);
       else if(ability.type==='power_one'||ability.type==='power_self'||ability.type==='ensemble')value+=ability.amount||0;
-      else if(ability.type==='creator_synergy'&&player.field.some(function(song){return song.producer===ability.producer;}))value+=ability.amount||0;
+      else if(ability.type==='creator_synergy'&&player.field.some(function(song){return producerMatches(song.producer,ability.producer);})){value+=(ability.amount||0)*player.field.filter(function(song){return producerMatches(song.producer,ability.producer);}).length;}
       else if(ability.type==='reveal_top_cost_song')value+=700;
     });
     return value;
@@ -550,5 +569,5 @@
     return true;
   }
 
-  return { RARITY_WEIGHTS: RARITY_WEIGHTS, DEFAULT_RULES: DEFAULT_RULES, openPack: openPack, openFivePacks: openFivePacks, autoBuild: autoBuild, makeBattle: makeBattle, setLeaders: setLeaders, mulligan: mulligan, playCard: playCard, resolvePowerChoice: resolvePowerChoice, attack: attack, endTurn: endTurn, cpuMainPhase: cpuMainPhase, cpuTurn: cpuTurn, effectivePower: effectivePower, rankDifficulty: rankDifficulty, validate: validate };
+  return { RARITY_WEIGHTS: RARITY_WEIGHTS, DEFAULT_RULES: DEFAULT_RULES, openPack: openPack, openFivePacks: openFivePacks, autoBuild: autoBuild, makeBattle: makeBattle, setLeaders: setLeaders, mulligan: mulligan, playCard: playCard, resolvePowerChoice: resolvePowerChoice, attack: attack, endTurn: endTurn, cpuMainPhase: cpuMainPhase, cpuTurn: cpuTurn, effectivePower: effectivePower, producerMatches: producerMatches, rankDifficulty: rankDifficulty, validate: validate };
 }));

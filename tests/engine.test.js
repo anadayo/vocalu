@@ -257,8 +257,8 @@ producerMiss.user.hand = [{...global.VocaluCatalog.producers.find(c => c.abiliti
 producerMiss.user.deck = [{...strongDeck[0],cost:2},...producerMiss.user.deck];
 const missDeckSize = producerMiss.user.deck.length;
 E.playCard(producerMiss,'user',0,0);
-assert.equal(producerMiss.user.hand.length,0,'a revealed nonmatching song is not added to hand');
-assert.equal(producerMiss.user.deck.length,missDeckSize,'a revealed nonmatching song moves to the bottom without changing deck size');
+assert.equal(producerMiss.user.hand.length,1,'a revealed nonmatching song is not added, but the support still draws one card');
+assert.equal(producerMiss.user.deck.length,missDeckSize-1,'the miss moves to the bottom before the guaranteed support draw');
 assert.equal(producerMiss.lastSupport.revealed.outcome,'bottom','nonmatching deck-top reveal reports the bottom-deck destination to the UI');
 
 const producerPower = E.makeBattle(strongDeck, weakDeck, () => 0.1);
@@ -278,10 +278,10 @@ producerTarget.user.hand = [{...global.VocaluCatalog.producers.find(c => c.abili
 const unchosenProducerPower = E.effectivePower(producerTarget.user.field[0]);
 const chosenProducerPower = E.effectivePower(producerTarget.user.field[1]);
 E.playCard(producerTarget,'user',0,0);
-assert.equal(producerTarget.pendingPowerChoice.amount,2500,'single-target producer support waits for a player target');
+assert.equal(producerTarget.pendingPowerChoice.amount,3000,'single-target producer support waits for a player target');
 E.resolvePowerChoice(producerTarget,'user',1);
 assert.equal(E.effectivePower(producerTarget.user.field[0]),unchosenProducerPower,'producer support leaves the unchosen song unchanged');
-assert.equal(E.effectivePower(producerTarget.user.field[1]),chosenProducerPower+2500,'producer support boosts only the chosen song');
+assert.equal(E.effectivePower(producerTarget.user.field[1]),chosenProducerPower+3000,'producer support boosts only the chosen song');
 
 const creatorSynergy = E.makeBattle(strongDeck, weakDeck, () => 0.1);
 const linkedProducer = global.VocaluCatalog.producers[0];
@@ -290,6 +290,18 @@ creatorSynergy.user.hand = [{...linkedProducer}];
 const linkedPowerBefore = E.effectivePower(creatorSynergy.user.field[0]);
 E.playCard(creatorSynergy,'user',0,0);
 assert.equal(E.effectivePower(creatorSynergy.user.field[0]),linkedPowerBefore+global.VocaluCatalog.balanceConfig.creatorSynergyPower,'producer strengthens its own linked song through shared support resolution');
+
+const collaborationSynergy = E.makeBattle(strongDeck, weakDeck, () => 0.1);
+const collaborationProducer = global.VocaluCatalog.producers.find(c => c.name === 'DECO*27');
+collaborationSynergy.user.field = [{...strongDeck[0],producer:'sasakure.UK×DECO*27',currentPower:3000,turnPowerBonus:0,attacked:false}];
+collaborationSynergy.user.hand = [{...collaborationProducer}];
+const collaborationPowerBefore = E.effectivePower(collaborationSynergy.user.field[0]);
+E.playCard(collaborationSynergy,'user',0,0);
+assert.equal(E.effectivePower(collaborationSynergy.user.field[0]),collaborationPowerBefore+global.VocaluCatalog.balanceConfig.creatorSynergyPower,'creator synergy recognizes collaboration credits');
+assert.ok(collaborationSynergy.lastSupport.resolved.some(result => /POWER \+1000/.test(result)),'support result reports the applied creator bonus');
+
+const rookieSupport = global.VocaluCatalog.producers[0];
+assert.ok(rookieSupport.abilities.some(a => a.type === 'draw_cards' && a.count === 1),'early producer support always replaces itself with one draw');
 
 function makeTriggerBattle(type) {
   const support = global.VocaluCatalog.cards.find(c => c.trigger && c.trigger.type === type);

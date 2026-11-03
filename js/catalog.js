@@ -182,14 +182,18 @@
   }
   function abilitiesForProducer(index, cost, name) {
     var synergy={ type:'creator_synergy', producer:name, amount:balanceConfig.creatorSynergyPower, label:'クリエイターリンク', text:'自分の制作楽曲が場にあれば、このターンその楽曲をPOWER +'+balanceConfig.creatorSynergyPower+'。' };
-    if (index < 10) return [{ type:'reveal_top_cost_song', maxCost:1, label:'ルーキー・サーチ', text:'デッキの上から1枚を公開する。1コストの楽曲なら手札に加え、それ以外はデッキの下へ送る。' },synergy];
+    if (index < 10) return [
+      { type:'reveal_top_cost_song', maxCost:1, label:'ルーキー・サーチ', text:'デッキの上から1枚を公開する。1コストの楽曲なら手札に加え、それ以外はデッキの下へ送る。' },
+      { type:'draw_cards', count:1, label:'スタジオ・ドロー', text:'カードを1枚引く。' },
+      synergy
+    ];
     var patterns = [
       [{ type:'draw_cards', count:2, label:'クリエイターズ・ドロー', text:'カードを2枚引く。' }],
-      [{ type:'power_all', amount:1000, label:'フルミックス', text:'このターン、自分の楽曲すべてをPOWER +1000。' }],
-      [{ type:'power_one', amount:2500, label:'スポットライト', text:'自分の楽曲1枚までを選び、このターンPOWER +2500。' }],
+      [{ type:'power_all', amount:1500, label:'フルミックス', text:'このターン、自分の楽曲すべてをPOWER +1500。' }],
+      [{ type:'power_one', amount:3000, label:'スポットライト', text:'自分の楽曲1枚までを選び、このターンPOWER +3000。' }],
       [
         { type:'draw_cards', count:1, label:'デモテープ', text:'カードを1枚引く。' },
-        { type:'power_all', amount:500, label:'マスタリング', text:'このターン、自分の楽曲すべてをPOWER +500。' }
+        { type:'power_all', amount:1000, label:'マスタリング', text:'このターン、自分の楽曲すべてをPOWER +1000。' }
       ]
     ];
     return patterns[index % patterns.length].concat([synergy]);
