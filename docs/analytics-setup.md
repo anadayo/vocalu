@@ -5,8 +5,8 @@
 - 公開URL: `https://anadayo.github.io/vocalu/`
 - GA4測定ID: 既存の`G-1RKFX1HCCV`を継続利用
 - Notion data source: `VOCALU｜運用・アクセス日次レポート`
-- 同期時刻: 毎日03:20 JST。前日の実測値を同期
-- 手動実行: GitHub Actionsの`VOCALU daily analytics sync`から日付を指定可能
+- 定期同期: 親リポジトリの共通日次分析Actionから、毎日09:15 JSTに前日分を同期
+- 手動復旧: GitHub Actionsの`VOCALU daily analytics sync`から日付を指定可能（下記Secretsを登録した場合のみ）
 
 ## GitHub Actions Secrets
 
