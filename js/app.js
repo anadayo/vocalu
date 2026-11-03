@@ -11,15 +11,15 @@
   var PLAYER_PROFILES_STORAGE = 'vocalu-player-profiles-v1';
   var CURRENT_PLAYER_STORAGE = 'vocalu-current-player-v1';
   var LEADER_STORAGE = 'vocalu-leader-v1';
-  var MUSIC_STORAGE = 'vocalu-audio-v2';
+  var MUSIC_STORAGE = 'vocalu-audio-v3';
   var state = {
     screen: 'home', opened: [], packNo: 0, selected: [], battle: null,
     selectedUnit: null, targeting: null, pendingAttack: null, panelTab: 'log', triggerResume: null, lifeSequence: null, mulliganSelected: [],
     difficulty: 'normal', matchMode: 'free', leaderChoice: loadLeaderChoice(), rank: loadRank(),
     collection: loadAndMigrate(), light: matchMedia('(prefers-reduced-motion: reduce)').matches,
     collectionType: 'all', collectionSort: 'number', collectionView: 'all', collectionQuery: '',
-    music: { ready: false, playing: false, enabled: loadAudioPreference('musicEnabled',true), volume: loadAudioPreference('musicVolume',40), theme: 'menu', title: 'VOCALU LOBBY THEME' },
-    sound: { enabled: loadAudioPreference('soundEnabled',true), volume: loadAudioPreference('soundVolume',55) }
+    music: { ready: false, playing: false, enabled: loadAudioPreference('musicEnabled',true), volume: loadAudioPreference('musicVolume',65), theme: 'menu', title: 'VOCALU LOBBY THEME' },
+    sound: { enabled: loadAudioPreference('soundEnabled',true), volume: loadAudioPreference('soundVolume',45) }
   };
   var audioContext = null;
   var musicGain = null;
@@ -455,8 +455,8 @@
   function toast(message){var old=document.querySelector('.error-toast');if(old)old.remove();var el=document.createElement('div');el.className='error-toast';el.textContent=message;document.body.appendChild(el);setTimeout(function(){el.remove();},3500);}
   function lockBattleInput(duration){battleInputLockedUntil=Date.now()+(state.light?40:(duration||520));}
   function screenMusicTheme(){return state.screen==='battle'||state.screen==='opening'?'battle':'menu';}
-  function musicLevel(){return Math.max(0,Math.min(1,state.music.volume/100))*0.16;}
-  function soundLevel(){return Math.max(0,Math.min(1,state.sound.volume/100))*0.24;}
+  function musicLevel(){return Math.max(0,Math.min(1,state.music.volume/100))*0.36;}
+  function soundLevel(){return Math.max(0,Math.min(1,state.sound.volume/100))*0.18;}
   function setMusicVolume(){if(musicGain&&audioContext)musicGain.gain.setTargetAtTime(state.music.playing?musicLevel():0,audioContext.currentTime,.03);}
   function setSoundVolume(){if(soundGain&&audioContext)soundGain.gain.setTargetAtTime(state.sound.enabled?soundLevel():0,audioContext.currentTime,.02);}
   function scheduleTone(frequency,start,duration,type,level){
@@ -595,6 +595,10 @@
   document.addEventListener('submit',function(event){if(!event.target.matches('[data-collection-form]'))return;event.preventDefault();var input=event.target.querySelector('[data-collection-query]');state.collectionQuery=(input&&input.value||'').trim();render();});
   document.addEventListener('change',function(event){if(!event.target.matches('[data-collection-sort]'))return;state.collectionSort=event.target.value;render();});
   document.addEventListener('input',function(event){if(!event.target.matches('[data-volume]'))return;var sound=event.target.dataset.volume==='sound',dialog=event.target.closest('.dialog');if(sound){state.sound.volume=Number(event.target.value);var soundLabel=dialog.querySelector('[data-sound-volume-label]');if(soundLabel)soundLabel.textContent=state.sound.volume;setSoundVolume();}else{state.music.volume=Number(event.target.value);var label=dialog.querySelector('[data-volume-label]');if(label)label.textContent=state.music.volume;setMusicVolume();}saveAudioPreferences();});
+  function unlockGameAudio(){if(state.music.enabled&&!state.music.playing)startScreenMusic();}
+  document.addEventListener('pointerdown',unlockGameAudio,{once:true,passive:true});
+  document.addEventListener('touchstart',unlockGameAudio,{once:true,passive:true});
+  document.addEventListener('keydown',unlockGameAudio,{once:true});
   var startY=0;app.addEventListener('touchstart',function(e){var p=e.target.closest('[data-action="open-pack"]');if(p&&e.touches[0])startY=e.touches[0].clientY;},{passive:true});app.addEventListener('touchend',function(e){var p=e.target.closest('[data-action="open-pack"]');if(p&&e.changedTouches[0]&&startY-e.changedTouches[0].clientY>35)p.click();},{passive:true});
   app.addEventListener('pointermove',function(e){if(state.targeting!=null)updateAttackTrail(e.clientX,e.clientY);},{passive:true});
   window.addEventListener('resize',function(){if(state.pendingAttack)requestAnimationFrame(updateCpuAttackTrail);});

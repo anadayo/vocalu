@@ -21,7 +21,11 @@ assert(app.includes("playSfx('destroy')"), 'Defeated battle cards need a separat
 assert(app.includes("kind==='damage'"), 'Leader damage needs a layered impact sound');
 assert(app.includes("kind==='destroy'"), 'Card destruction needs a layered burst sound');
 assert(app.includes("playSfx('trigger')"), 'Trigger activations need a game sound effect');
-assert(app.includes("vocalu-audio-v2"), 'Audio preferences must not inherit the broken YouTube setting');
+assert(app.includes("vocalu-audio-v3"), 'Audio preferences must not inherit the quiet legacy mix');
+assert(app.includes("volume: loadAudioPreference('musicVolume',65)"), 'BGM must default above sound effects');
+assert(app.includes("volume: loadAudioPreference('soundVolume',45)"), 'Sound effects need a restrained default mix');
+assert(app.includes("document.addEventListener('pointerdown',unlockGameAudio"), 'The first lobby interaction must unlock audio');
+assert(app.includes("document.addEventListener('touchstart',unlockGameAudio"), 'iPhone touch must unlock lobby audio');
 assert(app.includes("['SR','UR'].indexOf(card.rarity)"), 'High-rarity song entrances need a dedicated phrase');
 assert(app.includes('card.previewAudioUrl'), 'Rights-cleared song preview clips need a supported data hook');
 assert(app.includes('playGeneratedPhrase(card)'), 'Cards without cleared audio need an original fallback phrase');
