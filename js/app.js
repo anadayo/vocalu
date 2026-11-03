@@ -36,11 +36,10 @@
   }
 
   function syncMusicUi() {
-    var dock=document.getElementById('music-dock'),title=document.getElementById('music-dock-title'),toggle=document.getElementById('music-dock-toggle');
+    var dock=document.getElementById('music-dock'),title=document.getElementById('music-dock-title');
     if(!dock)return;
     dock.hidden=!state.music.enabled;
     if(title)title.textContent=state.music.title||'ユーザー制作楽曲メドレー';
-    if(toggle)toggle.textContent=state.music.playing?'Ⅱ':'▶';
   }
 
   function track(name, params) {
