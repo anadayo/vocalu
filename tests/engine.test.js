@@ -244,22 +244,13 @@ assert.equal(producerDraw.user.discard.some(c => c.type === 'producer'),true,'us
 producerDraw.user.hand.unshift({...global.VocaluCatalog.producers[1]});
 assert.throws(()=>E.playCard(producerDraw,'user',0,0),/1ターンに1枚/,'only one producer can be used each turn');
 
-const producerScout = E.makeBattle(strongDeck, weakDeck, () => 0.1);
-producerScout.user.hand = [{...global.VocaluCatalog.producers.find(c => c.abilities.some(a => a.type === 'reveal_top_cost_song'))}];
-producerScout.user.deck = [{...strongDeck[0],cost:1},...producerScout.user.deck];
-assert.doesNotThrow(()=>E.playCard(producerScout,'user',0,0),'a zero-cost producer can be used on the first player opening turn');
-assert.equal(producerScout.user.hand.some(c => c.type === 'song' && c.cost === 1),true,'zero-cost producer adds a revealed one-cost song to hand');
-assert.equal(producerScout.lastSupport.revealed.outcome,'hand','matching deck-top reveal reports the hand destination to the UI');
-assert.equal(producerScout.lastSupport.revealed.cardId,strongDeck[0].id,'matching deck-top reveal reports the exact card to the UI');
-
-const producerMiss = E.makeBattle(strongDeck, weakDeck, () => 0.1);
-producerMiss.user.hand = [{...global.VocaluCatalog.producers.find(c => c.abilities.some(a => a.type === 'reveal_top_cost_song'))}];
-producerMiss.user.deck = [{...strongDeck[0],cost:2},...producerMiss.user.deck];
-const missDeckSize = producerMiss.user.deck.length;
-E.playCard(producerMiss,'user',0,0);
-assert.equal(producerMiss.user.hand.length,1,'a revealed nonmatching song is not added, but the support still draws one card');
-assert.equal(producerMiss.user.deck.length,missDeckSize-1,'the miss moves to the bottom before the guaranteed support draw');
-assert.equal(producerMiss.lastSupport.revealed.outcome,'bottom','nonmatching deck-top reveal reports the bottom-deck destination to the UI');
+const producerStarter = E.makeBattle(strongDeck, weakDeck, () => 0.1);
+producerStarter.user.hand = [{...global.VocaluCatalog.producers[0]}];
+const starterDeckSize = producerStarter.user.deck.length;
+assert.doesNotThrow(()=>E.playCard(producerStarter,'user',0,0),'a zero-cost producer can be used on the first player opening turn');
+assert.equal(producerStarter.user.hand.length,1,'starter producer replaces itself with one draw');
+assert.equal(producerStarter.user.deck.length,starterDeckSize-1,'starter producer draws exactly one card');
+assert.equal(producerStarter.lastSupport.revealed,null,'starter producer no longer performs rookie search');
 
 const producerPower = E.makeBattle(strongDeck, weakDeck, () => 0.1);
 producerPower.user.cost = 10;
@@ -302,6 +293,7 @@ assert.ok(collaborationSynergy.lastSupport.resolved.some(result => /POWER \+1000
 
 const rookieSupport = global.VocaluCatalog.producers[0];
 assert.ok(rookieSupport.abilities.some(a => a.type === 'draw_cards' && a.count === 1),'early producer support always replaces itself with one draw');
+assert.equal(rookieSupport.abilities.some(a => a.type === 'reveal_top_cost_song'),false,'early producer support no longer uses rookie search');
 
 function makeTriggerBattle(type) {
   const support = global.VocaluCatalog.cards.find(c => c.trigger && c.trigger.type === type);

@@ -183,7 +183,6 @@
   function abilitiesForProducer(index, cost, name) {
     var synergy={ type:'creator_synergy', producer:name, amount:balanceConfig.creatorSynergyPower, label:'クリエイターリンク', text:'自分の制作楽曲が場にあれば、このターンその楽曲をPOWER +'+balanceConfig.creatorSynergyPower+'。' };
     if (index < 10) return [
-      { type:'reveal_top_cost_song', maxCost:1, label:'ルーキー・サーチ', text:'デッキの上から1枚を公開する。1コストの楽曲なら手札に加え、それ以外はデッキの下へ送る。' },
       { type:'draw_cards', count:1, label:'スタジオ・ドロー', text:'カードを1枚引く。' },
       synergy
     ];
