@@ -24,6 +24,7 @@ assert(app.includes("playSfx('trigger')"), 'Trigger activations need a game soun
 assert(app.includes("vocalu-audio-v3"), 'Audio preferences must not inherit the quiet legacy mix');
 assert(app.includes("volume: loadAudioPreference('musicVolume',65)"), 'BGM must default above sound effects');
 assert(app.includes("volume: loadAudioPreference('soundVolume',45)"), 'Sound effects need a restrained default mix');
+assert(app.includes("state.music.theme==='battle'?0.36:0.48"), 'Lobby music must be louder than the battle mix');
 assert(app.includes("document.addEventListener('pointerdown',unlockGameAudio"), 'The first lobby interaction must unlock audio');
 assert(app.includes("document.addEventListener('touchstart',unlockGameAudio"), 'iPhone touch must unlock lobby audio');
 assert(app.includes("['SR','UR'].indexOf(card.rarity)"), 'High-rarity song entrances need a dedicated phrase');

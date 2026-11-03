@@ -167,7 +167,12 @@
   function leaderInfo(id) {
     var isTeto=id==='teto',name=isTeto?'重音テト':'初音ミク';
     var card=VocaluCatalog.singers.find(function(item){return item.name===name;});
-    return { id:isTeto?'teto':'miku', name:name, image:card&&card.thumbnailUrl, skill:isTeto?'毎ターン最初の攻撃をPOWER +500。覚醒後は+1000。':'毎ターン最初に登場する楽曲をPOWER +500。覚醒後は+1000。' };
+    return { id:isTeto?'teto':'miku', name:name, image:card&&card.thumbnailUrl, skill:isTeto?'毎ターン最初の攻撃をPOWER +500。覚醒後は+1000。':'毎ターン最初に登場する楽曲をPOWER +500。覚醒後は+1000。', normal:isTeto?'毎ターン最初に攻撃する自分の楽曲1枚を、このターンPOWER +500。':'毎ターン最初に登場する自分の楽曲1枚を、このターンPOWER +500。', awakened:isTeto?'毎ターン最初に攻撃する自分の楽曲1枚を、このターンPOWER +1000。':'毎ターン最初に登場する自分の楽曲1枚を、このターンPOWER +1000。' };
+  }
+  function showLeaderInfo(side) {
+    if(!state.battle)return;
+    var player=state.battle[side==='cpu'?'cpu':'user'],leader=leaderInfo(player.leader),awake=player.leaderAwakened;
+    choose(leader.name+' · LEADER','<div class="leader-detail"><div class="leader-detail-status ' + (awake?'awakened':'') + '"><span>' + (side==='cpu'?'CPU LEADER':'YOUR LEADER') + '</span><b>' + (awake?'AWAKENED':'NORMAL') + '</b><small>LIFE ' + player.life + ' / 5</small></div><section class="' + (!awake?'current':'') + '"><span>通常スキル</span><p>' + esc(leader.normal) + '</p></section><section class="' + (awake?'current':'') + '"><span>覚醒後スキル</span><p>' + esc(leader.awakened) + '</p></section><p class="leader-detail-note">LIFE 2以下で一度覚醒すると、回復後も覚醒状態を維持します。</p></div>');
   }
   function hueFor(value) { var total=0; String(value).split('').forEach(function(c){total=(total+c.charCodeAt(0)*17)%360;}); return total; }
   function artHtml(card) {
@@ -297,8 +302,8 @@
   function lifeRail(player,side,damageSide){
     var name=side==='cpu'?'CPU':'YOU',leader=leaderInfo(player.leader),awake=player.leaderAwakened,damaged=damageSide===side;
     var playerHtml='<div class="rail-player"><b>' + name + '</b><span><i class="mini-leek"></i>' + player.cost + '/' + player.maxCost + '</span></div>';
-    var attackable=side==='cpu'&&state.targeting!=null,leaderTag=attackable?'button':'div';
-    var leaderHtml='<' + leaderTag + ' class="leader-skin leader-' + leader.id + ' ' + (awake?'awakened ':'') + (damaged?'damaged ':'') + (attackable?'targetable ':'') + '" data-leader-skin="' + side + '" ' + (attackable?'data-action="attack-leader" aria-label="'+esc(leader.name)+'へ攻撃"':'') + '><div class="leader-aura"><i></i><i></i><i></i></div><div class="leader-art">' + (leader.image?'<img src="' + esc(leader.image) + '" alt="' + esc(leader.name) + '">':'<span>' + esc(leader.name.slice(0,1)) + '</span>') + '</div><div class="leader-name"><small>LEADER</small><b>' + esc(leader.name) + '</b></div>' + (awake?'<em>AWAKEN</em>':'') + '<i class="damage-burst"></i></' + leaderTag + '>';
+    var attackable=side==='cpu'&&state.targeting!=null;
+    var leaderHtml='<button class="leader-skin leader-' + leader.id + ' ' + (awake?'awakened ':'') + (damaged?'damaged ':'') + (attackable?'targetable ':'') + '" data-leader-skin="' + side + '" data-action="' + (attackable?'attack-leader':'leader-info') + '" data-side="' + side + '" aria-label="' + esc(attackable?leader.name+'へ攻撃':leader.name+'のスキルを確認') + '"><div class="leader-aura"><i></i><i></i><i></i></div><div class="leader-art">' + (leader.image?'<img src="' + esc(leader.image) + '" alt="' + esc(leader.name) + '">':'<span>' + esc(leader.name.slice(0,1)) + '</span>') + '</div><div class="leader-name"><small>LEADER</small><b>' + esc(leader.name) + '</b></div>' + (awake?'<em>AWAKEN</em>':'') + (!attackable?'<span class="leader-info-mark" aria-hidden="true">i</span>':'') + '<i class="damage-burst"></i></button>';
     var lifeHtml=lifeCards(player,side);
     return '<div class="life-rail ' + side + '">' + (side==='cpu'?lifeHtml+leaderHtml+playerHtml:playerHtml+leaderHtml+lifeHtml) + '</div>';
   }
@@ -455,7 +460,7 @@
   function toast(message){var old=document.querySelector('.error-toast');if(old)old.remove();var el=document.createElement('div');el.className='error-toast';el.textContent=message;document.body.appendChild(el);setTimeout(function(){el.remove();},3500);}
   function lockBattleInput(duration){battleInputLockedUntil=Date.now()+(state.light?40:(duration||520));}
   function screenMusicTheme(){return state.screen==='battle'||state.screen==='opening'?'battle':'menu';}
-  function musicLevel(){return Math.max(0,Math.min(1,state.music.volume/100))*0.36;}
+  function musicLevel(){return Math.max(0,Math.min(1,state.music.volume/100))*(state.music.theme==='battle'?0.36:0.48);}
   function soundLevel(){return Math.max(0,Math.min(1,state.sound.volume/100))*0.18;}
   function setMusicVolume(){if(musicGain&&audioContext)musicGain.gain.setTargetAtTime(state.music.playing?musicLevel():0,audioContext.currentTime,.03);}
   function setSoundVolume(){if(soundGain&&audioContext)soundGain.gain.setTargetAtTime(state.sound.enabled?soundLevel():0,audioContext.currentTime,.02);}
@@ -531,7 +536,7 @@
 
   document.addEventListener('click',function(event){var button=event.target.closest('[data-action]');if(!button)return;var action=button.dataset.action;try{
     if(state.music.enabled&&!state.music.playing&&['music-toggle','music-disable'].indexOf(action)<0)startScreenMusic();
-    if(state.screen==='battle'&&state.lifeSequence&&['battle-guide','battle-settings'].indexOf(action)<0)return;
+    if(state.screen==='battle'&&state.lifeSequence&&['battle-guide','battle-settings','leader-info'].indexOf(action)<0)return;
     if(state.screen==='battle'&&Date.now()<battleInputLockedUntil&&['play','replace-play','equip-play','attack-leader','end-turn','resolve-cpu-attack'].indexOf(action)>=0)return;
     if(action==='start'||action==='free-match')beginMatch('free');
     else if(action==='ranked-match'){if(state.rank.username)beginMatch('ranked');else rankRegistration(true);}
@@ -559,6 +564,7 @@
     else if(action==='select-unit'){var side=button.dataset.side,index=Number(button.dataset.index);if(state.battle.pendingPowerChoice&&state.battle.pendingPowerChoice.side==='user'&&side==='user'){VocaluEngine.resolvePowerChoice(state.battle,'user',index);state.selectedUnit=null;state.panelTab='log';render();}else if(side==='cpu'&&state.targeting!=null&&state.battle.cpu.field[index].attacked)resolveUserAttack('song',index);else if(side==='cpu'&&state.targeting!=null)toast('ACTIVE状態の楽曲は攻撃対象にできません');else{state.selectedUnit={side:side,index:index};state.panelTab='action';state.targeting=side==='user'&&state.battle.active==='user'&&!state.battle.user.field[index].attacked?index:null;render();}}
     else if(action==='skip-power-choice'){VocaluEngine.resolvePowerChoice(state.battle,'user',null);state.selectedUnit=null;state.panelTab='log';render();}
     else if(action==='attack-leader')resolveUserAttack('life',null);
+    else if(action==='leader-info')showLeaderInfo(button.dataset.side);
     else if(action==='cancel-action'){state.targeting=null;state.selectedUnit=null;state.panelTab='log';render();}
     else if(action==='panel-tab'){state.panelTab=button.dataset.tab;render();}
     else if(action==='battle-detail')battleDetail(button.dataset.side,Number(button.dataset.index));
