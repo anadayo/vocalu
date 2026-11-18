@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>VOCALU 15s Short Renderer</title>
+  <style>
+    *{box-sizing:border-box}body{margin:0;background:#071011;color:#fff;font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Yu Gothic",sans-serif;display:grid;place-items:center;min-height:100vh}.stage{display:grid;gap:14px;justify-items:center;padding:20px}canvas{width:min(360px,92vw);height:auto;aspect-ratio:9/16;background:#05090a;box-shadow:0 18px 80px #000;border:1px solid #285c59}button{border:0;background:#82e1d8;color:#061211;font-weight:900;padding:13px 22px;font-size:15px;cursor:pointer}p{margin:0;color:#9eb5b3;font-size:12px}
+  </style>
+</head>
+<body>
+  <main class="stage">
+    <canvas id="canvas" width="1080" height="1920"></canvas>
+    <button id="record">15秒WebMを書き出す</button>
+    <p>実サイト画面のみ使用 · 1080×1920 · 30fps</p>
+  </main>
+  <script>
+    const canvas=document.querySelector('#canvas');
+    const ctx=canvas.getContext('2d');
+    const shots=[
+      {src:'01-pack.jpg',title:'ボカロ曲を\nパックで引く',tag:'01  OPEN'},
+      {src:'02-cards.jpg',title:'好きな曲が\nカードになる',tag:'02  COLLECT'},
+      {src:'03-deck.jpg',title:'20枚を選んで\nデッキを組む',tag:'03  BUILD'},
+      {src:'04-battle.jpg',title:'スマホで\nすぐCPU対戦',tag:'04  BATTLE'},
+      {src:'05-summon.jpg',title:'あなたの推し曲で\n1戦だけ試して',tag:'VOCALU'}
+    ];
+    let images=[];let started=performance.now();let recording=false;
+    const load=src=>new Promise((resolve,reject)=>{const im=new Image();im.onload=()=>resolve(im);im.onerror=reject;im.src=src});
+    function ease(x){return x<.5?2*x*x:1-Math.pow(-2*x+2,2)/2}
+    function frame(now){
+      const t=Math.max(0,((now-started)/1000)%15);
+      const i=Math.min(4,Math.floor(t/3));
+      const local=(t-i*3)/3;
+      const im=images[i];
+      ctx.clearRect(0,0,1080,1920);
+      ctx.fillStyle='#050a0b';ctx.fillRect(0,0,1080,1920);
+      const zoom=1.02+.06*ease(local);
+      const sw=im.width/zoom,sh=im.height/zoom;
+      const sx=(im.width-sw)*(.48+.04*Math.sin(local*Math.PI));
+      const sy=(im.height-sh)*(.15+.55*local);
+      ctx.save();ctx.globalAlpha=Math.min(1,local*5,(1-local)*5);ctx.drawImage(im,sx,sy,sw,sh,0,0,1080,1920);ctx.restore();
+      const grad=ctx.createLinearGradient(0,0,0,1920);grad.addColorStop(0,'rgba(2,9,10,.68)');grad.addColorStop(.32,'rgba(2,9,10,0)');grad.addColorStop(.7,'rgba(2,9,10,.08)');grad.addColorStop(1,'rgba(2,9,10,.88)');ctx.fillStyle=grad;ctx.fillRect(0,0,1080,1920);
+      ctx.fillStyle='#83e3d9';ctx.font='800 36px sans-serif';ctx.fillText(shots[i].tag,64,110);
+      ctx.strokeStyle='rgba(131,227,217,.72)';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(64,138);ctx.lineTo(340,138);ctx.stroke();
+      const lines=shots[i].title.split('\n');ctx.fillStyle='#fff';ctx.font='900 86px sans-serif';ctx.shadowColor='rgba(0,0,0,.8)';ctx.shadowBlur=22;lines.forEach((line,n)=>ctx.fillText(line,64,1520+n*112));ctx.shadowBlur=0;
+      if(i===4){ctx.beginPath();ctx.roundRect(64,1762,952,96,12);ctx.fillStyle='#83e3d9';ctx.fill();ctx.fillStyle='#051011';ctx.font='900 39px sans-serif';ctx.textAlign='center';ctx.fillText('ブラウザで無料・登録不要',540,1825);ctx.textAlign='start'}
+      ctx.fillStyle='rgba(255,255,255,.82)';ctx.font='700 28px sans-serif';ctx.fillText('ボカる！ / VOCALU',64,1880);
+      ctx.fillStyle='rgba(255,255,255,.22)';ctx.fillRect(64,1900,952,6);ctx.fillStyle='#83e3d9';ctx.fillRect(64,1900,952*(t/15),6);
+      requestAnimationFrame(frame);
+    }
+    function music(stream){
+      const audio=new AudioContext();const dest=audio.createMediaStreamDestination();const master=audio.createGain();master.gain.value=.12;master.connect(dest);const start=audio.currentTime+.03;
+      for(let beat=0;beat<30;beat++){const at=start+beat*.5;const osc=audio.createOscillator();const gain=audio.createGain();osc.type=beat%4===0?'square':'triangle';osc.frequency.value=[110,147,165,196][Math.floor(beat/4)%4];gain.gain.setValueAtTime(0,at);gain.gain.linearRampToValueAtTime(beat%4===0?.34:.12,at+.012);gain.gain.exponentialRampToValueAtTime(.001,at+.22);osc.connect(gain).connect(master);osc.start(at);osc.stop(at+.24)}
+      dest.stream.getAudioTracks().forEach(track=>stream.addTrack(track));return audio;
+    }
+    async function record(){
+      if(recording)return;recording=true;document.querySelector('#record').textContent='書き出し中…';started=performance.now();
+      const stream=canvas.captureStream(30);const audio=music(stream);const chunks=[];const mime=MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')?'video/webm;codecs=vp9,opus':'video/webm';const recorder=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:9000000});
+      recorder.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};recorder.onstop=()=>{const blob=new Blob(chunks,{type:mime});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='vocalu-15s-2026-11-18.webm';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);audio.close();recording=false;document.querySelector('#record').textContent='15秒WebMを書き出す'};recorder.start(250);setTimeout(()=>recorder.stop(),15050);
+    }
+    Promise.all(shots.map(x=>load(x.src))).then(result=>{images=result;requestAnimationFrame(frame)});
+    document.querySelector('#record').addEventListener('click',record);
+  </script>
+</body>
+</html>
